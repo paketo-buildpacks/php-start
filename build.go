@@ -80,8 +80,8 @@ func Build(procs ProcMgr, logger scribe.Emitter) packit.BuildFunc {
 		logger.Debug.Break()
 		err = os.Mkdir(filepath.Join(layer.Path, "bin"), os.ModePerm)
 		if err != nil {
-			panic(err)
-			// return packit.BuildResult{}, err
+			//untested
+			return packit.BuildResult{}, err
 		}
 
 		err = fs.Copy(filepath.Join(context.CNBPath, "bin", "procmgr-binary"), filepath.Join(layer.Path, "bin", "procmgr-binary"))
