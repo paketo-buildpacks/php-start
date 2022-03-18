@@ -89,9 +89,6 @@ func Build(procs ProcMgr, logger scribe.Emitter) packit.BuildFunc {
 			return packit.BuildResult{}, fmt.Errorf("failed to copy procmgr-binary into layer: %w", err)
 		}
 
-		layer.LaunchEnv.Prepend("PATH", filepath.Join(layer.Path, "bin"), string(os.PathListSeparator))
-		logger.EnvironmentVariables(layer)
-
 		processes := []packit.Process{
 			{
 				Type:    "web",

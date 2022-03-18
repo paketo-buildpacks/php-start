@@ -87,9 +87,6 @@ func testDefault(t *testing.T, context spec.G, it spec.S) {
 					"",
 					fmt.Sprintf("  Copying procmgr-binary into /layers/%s/php-start/bin/procmgr-binary", strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_")),
 					"",
-					"  Configuring launch environment",
-					fmt.Sprintf("    PATH -> \"/layers/%s/php-start/bin:$PATH\"", strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_")),
-					"",
 					"  Assigning launch processes:",
 					fmt.Sprintf("    web (default): procmgr-binary /layers/%s/php-start/procs.yml", strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_")),
 				))

@@ -96,10 +96,6 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 			Expect(result.Layers[0].Path).To(Equal(filepath.Join(layersDir, "php-start")))
 			Expect(result.Layers[0].Launch).To(BeTrue())
 			Expect(result.Layers[0].Build).To(BeFalse())
-			Expect(result.Layers[0].LaunchEnv).To(Equal(packit.Environment{
-				"PATH.prepend": filepath.Join(layersDir, "php-start", "bin"),
-				"PATH.delim":   ":",
-			}))
 
 			Expect(procMgr.AddCall.CallCount).To(Equal(1))
 			Expect(procMgr.AddCall.Receives.Name).To(Equal("httpd"))
