@@ -32,7 +32,6 @@ var (
 	}
 )
 
-// TODO update integration.json URIs
 func TestIntegration(t *testing.T) {
 	Expect := NewWithT(t).Expect
 
@@ -72,7 +71,6 @@ func TestIntegration(t *testing.T) {
 	Expect(err).NotTo(HaveOccurred())
 
 	phpFpmBuildpack, err = buildpackStore.Get.
-		WithVersion("1.2.3").
 		Execute(config.PhpFpm)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -81,7 +79,6 @@ func TestIntegration(t *testing.T) {
 	Expect(err).NotTo(HaveOccurred())
 
 	phpHttpdBuildpack, err = buildpackStore.Get.
-		WithVersion("1.2.3").
 		Execute(config.PhpHttpd)
 	Expect(err).NotTo(HaveOccurred())
 
