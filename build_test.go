@@ -196,7 +196,7 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 			})
 		})
 
-		context("when the python layer cannot be reset", func() {
+		context("when the php-start layer cannot be reset", func() {
 			it.Before(func() {
 				Expect(os.MkdirAll(filepath.Join(layersDir, "php-start", "something"), os.ModePerm)).To(Succeed())
 				Expect(os.Chmod(filepath.Join(layersDir, "php-start"), 0500)).To(Succeed())
