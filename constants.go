@@ -1,0 +1,3 @@
+package phpstart
+
+const ()
