@@ -1,0 +1,19 @@
+api = "0.7"
+
+[buildpack]
+  description = "A buildpack for starting PHP app server start commands"
+  homepage = "https://github.com/paketo-buildpacks/php-start"
+  id = "paketo-buildpacks/php-start"
+  keywords = ["php", "httpd", "nginx"]
+  name = "Paketo PHP Start Buildpack"
+
+  [[buildpack.licenses]]
+    type = "Apache-2.0"
+    uri = "https://github.com/paketo-buildpacks/php-start/blob/main/LICENSE"
+
+[metadata]
+  include-files = ["bin/build", "bin/detect", "bin/procmgr-binary", "bin/run", "buildpack.toml"]
+  pre-package = "./scripts/build.sh"
+
+[[stacks]]
+  id = "io.buildpacks.stacks.bionic"

@@ -1,0 +1,7 @@
+{
+  "builder": "index.docker.io/paketobuildpacks/builder:buildpackless-full",
+  "php-dist" : "github.com/paketo-buildpacks/php-dist",
+  "php-fpm" : "github.com/paketo-buildpacks/php-fpm",
+  "httpd" : "github.com/paketo-buildpacks/httpd",
+  "php-httpd" : "github.com/paketo-buildpacks/php-httpd"
+}
