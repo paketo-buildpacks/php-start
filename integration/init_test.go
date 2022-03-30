@@ -22,6 +22,8 @@ var (
 	phpFpmBuildpack   string
 	httpdBuildpack    string
 	phpHttpdBuildpack string
+	nginxBuildpack    string
+	phpNginxBuildpack string
 	root              string
 
 	buildpackInfo struct {
@@ -42,6 +44,8 @@ func TestIntegration(t *testing.T) {
 		PhpFpm   string `json:"php-fpm"`
 		Httpd    string `json:"httpd"`
 		PhpHttpd string `json:"php-httpd"`
+		Nginx    string `json:"nginx"`
+		PhpNginx string `json:"php-nginx"`
 	}
 
 	file, err := os.Open("../integration.json")
@@ -82,9 +86,18 @@ func TestIntegration(t *testing.T) {
 		Execute(config.PhpHttpd)
 	Expect(err).NotTo(HaveOccurred())
 
+	nginxBuildpack, err = buildpackStore.Get.
+		Execute(config.Nginx)
+	Expect(err).NotTo(HaveOccurred())
+
+	phpNginxBuildpack, err = buildpackStore.Get.
+		Execute(config.PhpNginx)
+	Expect(err).NotTo(HaveOccurred())
+
 	SetDefaultEventuallyTimeout(10 * time.Second)
 
 	suite := spec.New("Integration", spec.Report(report.Terminal{}), spec.Parallel())
-	suite("Default", testDefault)
+	suite("Httpd", testHttpd)
+	suite("Nginx", testNginx)
 	suite.Run(t)
 }

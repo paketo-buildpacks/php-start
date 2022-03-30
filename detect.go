@@ -67,13 +67,46 @@ func Detect() packit.DetectFunc {
 			},
 		}
 
-		httpdFpmPlan.Requires = append(baseRequirements, httpdFpmPlan.Requires...)
+		nginxFpmPlan := packit.BuildPlan{
+			Requires: []packit.BuildPlanRequirement{
+				{
+					Name: "nginx",
+					Metadata: BuildPlanMetadata{
+						Launch: true,
+					},
+				},
+				{
+					Name: "nginx-config",
+					Metadata: BuildPlanMetadata{
+						Build:  true,
+						Launch: true,
+					},
+				},
+			},
+		}
 
-		// Eventually we can create a slice of plans that are Or'd together for
-		// HTTPD, Nginx, and the FPM included cases.
-		// See python-start detect phase as an example
+		httpdFpmPlan.Requires = append(baseRequirements, httpdFpmPlan.Requires...)
+		nginxFpmPlan.Requires = append(baseRequirements, nginxFpmPlan.Requires...)
+
+		plans := []packit.BuildPlan{httpdFpmPlan, nginxFpmPlan}
+
 		return packit.DetectResult{
-			Plan: httpdFpmPlan,
+			Plan: or(plans...),
 		}, nil
 	}
+}
+
+func or(plans ...packit.BuildPlan) packit.BuildPlan {
+	if len(plans) < 1 {
+		return packit.BuildPlan{}
+	}
+	combinedPlan := plans[0]
+
+	for i := range plans {
+		if i == 0 {
+			continue
+		}
+		combinedPlan.Or = append(combinedPlan.Or, plans[i])
+	}
+	return combinedPlan
 }

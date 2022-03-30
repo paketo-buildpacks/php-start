@@ -46,26 +46,43 @@ func Build(procs ProcMgr, logger scribe.Emitter) packit.BuildFunc {
 		}
 		layer.Launch = true
 
+		httpdConfPath, httpdOk := os.LookupEnv("PHP_HTTPD_PATH")
+		nginxConfPath, nginxOk := os.LookupEnv("PHP_NGINX_PATH")
+
+		if (!httpdOk && !nginxOk) ||
+			(httpdConfPath == "" && nginxConfPath == "") ||
+			(httpdConfPath != "" && nginxConfPath != "") {
+			return packit.BuildResult{}, errors.New("need exactly one of: $PHP_HTTPD_PATH or $PHP_NGINX_PATH")
+		}
+
 		logger.Process("Determining start commands to include in procs.yml:")
 		// HTTPD Case
-		httpdConfPath := os.Getenv("PHP_HTTPD_PATH")
 		if httpdConfPath != "" {
 			serverProc := NewProc("httpd", []string{"-f", httpdConfPath, "-k", "start", "-DFOREGROUND"})
 			procs.Add("httpd", serverProc)
 			logger.Subprocess("HTTPD: %s %v", serverProc.Command, strings.Join(serverProc.Args, " "))
 		}
 
-		// FPM Case
-		fpmConfPath := os.Getenv("PHP_FPM_PATH")
-		if fpmConfPath != "" {
-			phprcPath, ok := os.LookupEnv("PHPRC")
-			if !ok {
-				return packit.BuildResult{}, errors.New("failed to lookup $PHPRC path for FPM")
-			}
-			fpmProc := NewProc("php-fpm", []string{"-y", fpmConfPath, "-c", phprcPath})
-			procs.Add("fpm", fpmProc)
-			logger.Subprocess("FPM: %s %v", fpmProc.Command, strings.Join(fpmProc.Args, " "))
+		// Nginx Case
+		if nginxConfPath != "" {
+			serverProc := NewProc("nginx", []string{"-p", context.WorkingDir, "-c", nginxConfPath})
+			procs.Add("nginx", serverProc)
+			logger.Subprocess("Nginx: %s %v", serverProc.Command, strings.Join(serverProc.Args, " "))
 		}
+
+		// FPM Case
+		fpmConfPath, ok := os.LookupEnv("PHP_FPM_PATH")
+		if !ok || fpmConfPath == "" {
+			return packit.BuildResult{}, errors.New("failed to lookup $PHP_FPM_PATH")
+		}
+
+		phprcPath, ok := os.LookupEnv("PHPRC")
+		if !ok || phprcPath == "" {
+			return packit.BuildResult{}, errors.New("failed to lookup $PHPRC path for FPM")
+		}
+		fpmProc := NewProc("php-fpm", []string{"-y", fpmConfPath, "-c", phprcPath})
+		procs.Add("fpm", fpmProc)
+		logger.Subprocess("FPM: %s %v", fpmProc.Command, strings.Join(fpmProc.Args, " "))
 
 		// Write the process file
 		logger.Debug.Subprocess("Writing process file to %s", filepath.Join(layer.Path, "procs.yml"))

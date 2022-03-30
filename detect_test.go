@@ -67,6 +67,38 @@ func testDetect(t *testing.T, context spec.G, it spec.S) {
 						},
 					},
 				},
+				Or: []packit.BuildPlan{
+					{
+						Requires: []packit.BuildPlanRequirement{
+							{
+								Name: "php",
+								Metadata: phpstart.BuildPlanMetadata{
+									Build: true,
+								},
+							},
+							{
+								Name: "php-fpm",
+								Metadata: phpstart.BuildPlanMetadata{
+									Build:  true,
+									Launch: true,
+								},
+							},
+							{
+								Name: "nginx",
+								Metadata: phpstart.BuildPlanMetadata{
+									Launch: true,
+								},
+							},
+							{
+								Name: "nginx-config",
+								Metadata: phpstart.BuildPlanMetadata{
+									Launch: true,
+									Build:  true,
+								},
+							},
+						},
+					},
+				},
 			}))
 		})
 	})
