@@ -46,11 +46,10 @@ func Build(procs ProcMgr, logger scribe.Emitter) packit.BuildFunc {
 		}
 		layer.Launch = true
 
-		httpdConfPath, httpdOk := os.LookupEnv("PHP_HTTPD_PATH")
-		nginxConfPath, nginxOk := os.LookupEnv("PHP_NGINX_PATH")
+		httpdConfPath := os.Getenv("PHP_HTTPD_PATH")
+		nginxConfPath := os.Getenv("PHP_NGINX_PATH")
 
-		if (!httpdOk && !nginxOk) ||
-			(httpdConfPath == "" && nginxConfPath == "") ||
+		if (httpdConfPath == "" && nginxConfPath == "") ||
 			(httpdConfPath != "" && nginxConfPath != "") {
 			return packit.BuildResult{}, errors.New("need exactly one of: $PHP_HTTPD_PATH or $PHP_NGINX_PATH")
 		}
