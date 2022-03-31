@@ -41,26 +41,26 @@ func testDetect(t *testing.T, context spec.G, it spec.S) {
 			Expect(result.Plan).To(Equal(packit.BuildPlan{
 				Requires: []packit.BuildPlanRequirement{
 					{
-						Name: "php",
+						Name: phpstart.Php,
 						Metadata: phpstart.BuildPlanMetadata{
 							Build: true,
 						},
 					},
 					{
-						Name: "php-fpm",
+						Name: phpstart.PhpFpm,
 						Metadata: phpstart.BuildPlanMetadata{
 							Build:  true,
 							Launch: true,
 						},
 					},
 					{
-						Name: "httpd",
+						Name: phpstart.Httpd,
 						Metadata: phpstart.BuildPlanMetadata{
 							Launch: true,
 						},
 					},
 					{
-						Name: "httpd-config",
+						Name: phpstart.PhpHttpdConfig,
 						Metadata: phpstart.BuildPlanMetadata{
 							Launch: true,
 							Build:  true,
@@ -71,26 +71,26 @@ func testDetect(t *testing.T, context spec.G, it spec.S) {
 					{
 						Requires: []packit.BuildPlanRequirement{
 							{
-								Name: "php",
+								Name: phpstart.Php,
 								Metadata: phpstart.BuildPlanMetadata{
 									Build: true,
 								},
 							},
 							{
-								Name: "php-fpm",
+								Name: phpstart.PhpFpm,
 								Metadata: phpstart.BuildPlanMetadata{
 									Build:  true,
 									Launch: true,
 								},
 							},
 							{
-								Name: "nginx",
+								Name: phpstart.Nginx,
 								Metadata: phpstart.BuildPlanMetadata{
 									Launch: true,
 								},
 							},
 							{
-								Name: "nginx-config",
+								Name: phpstart.PhpNginxConfig,
 								Metadata: phpstart.BuildPlanMetadata{
 									Launch: true,
 									Build:  true,

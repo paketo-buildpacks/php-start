@@ -35,13 +35,13 @@ func Detect() packit.DetectFunc {
 	return func(context packit.DetectContext) (packit.DetectResult, error) {
 		baseRequirements := []packit.BuildPlanRequirement{
 			{
-				Name: "php",
+				Name: Php,
 				Metadata: BuildPlanMetadata{
 					Build: true,
 				},
 			},
 			{
-				Name: "php-fpm",
+				Name: PhpFpm,
 				Metadata: BuildPlanMetadata{
 					Build:  true,
 					Launch: true,
@@ -52,13 +52,13 @@ func Detect() packit.DetectFunc {
 		httpdFpmPlan := packit.BuildPlan{
 			Requires: []packit.BuildPlanRequirement{
 				{
-					Name: "httpd",
+					Name: Httpd,
 					Metadata: BuildPlanMetadata{
 						Launch: true,
 					},
 				},
 				{
-					Name: "httpd-config",
+					Name: PhpHttpdConfig,
 					Metadata: BuildPlanMetadata{
 						Build:  true,
 						Launch: true,
@@ -70,13 +70,13 @@ func Detect() packit.DetectFunc {
 		nginxFpmPlan := packit.BuildPlan{
 			Requires: []packit.BuildPlanRequirement{
 				{
-					Name: "nginx",
+					Name: Nginx,
 					Metadata: BuildPlanMetadata{
 						Launch: true,
 					},
 				},
 				{
-					Name: "nginx-config",
+					Name: PhpNginxConfig,
 					Metadata: BuildPlanMetadata{
 						Build:  true,
 						Launch: true,
