@@ -8,7 +8,7 @@ PHP apps.
 
 This buildpack will always participate if it's `requirements` are met. In the
 HTTPD server case `requires` `php`, `php-fpm` optionally, `httpd`, and
-`httpd-config`. In the Nginx case, it will require `nginx` and `nginx-config`
+`php-httpd-config`. In the Nginx case, it will require `nginx` and `php-nginx-config`
 instead of `httpd` and `httpd-config`.
 
 When this buildpack runs, the `PHP_HTTPD_PATH` OR the `PHP_NGINX_PATH`
