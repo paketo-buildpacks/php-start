@@ -8,6 +8,7 @@ import (
 	"github.com/sclevine/spec"
 )
 
+// TODO: remove print/echo statements
 func testProcmgr(t *testing.T, context spec.G, it spec.S) {
 	var Expect = NewWithT(t).Expect
 

@@ -3,6 +3,7 @@ package phpstart_test
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -25,8 +26,9 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 		workingDir string
 		cnbDir     string
 
-		buffer  *bytes.Buffer
-		procMgr *fakes.ProcMgr
+		buffer    *bytes.Buffer
+		procMgr   *fakes.ProcMgr
+		processes map[string]phpstart.Proc
 
 		build packit.BuildFunc
 	)
@@ -48,6 +50,10 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 		logEmitter := scribe.NewEmitter(buffer)
 
 		procMgr = &fakes.ProcMgr{}
+		processes = map[string]phpstart.Proc{}
+		procMgr.AddCall.Stub = func(procName string, newProc phpstart.Proc) {
+			processes[procName] = newProc
+		}
 		build = phpstart.Build(procMgr, logEmitter)
 	})
 
@@ -55,64 +61,6 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 		Expect(os.RemoveAll(layersDir)).To(Succeed())
 		Expect(os.RemoveAll(cnbDir)).To(Succeed())
 		Expect(os.RemoveAll(workingDir)).To(Succeed())
-	})
-
-	context("the PHP_HTTPD_PATH env var is set", func() {
-		it.Before(func() {
-			Expect(os.Setenv("PHP_HTTPD_PATH", "httpd-conf-path")).To(Succeed())
-		})
-
-		it.After(func() {
-			Expect(os.Unsetenv("PHP_HTTPD_PATH")).To(Succeed())
-		})
-
-		it("returns a result that sets an HTTPD start command", func() {
-			result, err := build(packit.BuildContext{
-				WorkingDir: workingDir,
-				CNBPath:    cnbDir,
-				Stack:      "some-stack",
-				BuildpackInfo: packit.BuildpackInfo{
-					Name:    "Some Buildpack",
-					Version: "some-version",
-				},
-				Plan: packit.BuildpackPlan{
-					Entries: []packit.BuildpackPlanEntry{},
-				},
-				Layers: packit.Layers{Path: layersDir},
-			})
-			Expect(err).NotTo(HaveOccurred())
-
-			Expect(result.Launch.Processes[0]).To(Equal(packit.Process{
-				Type:    "web",
-				Command: "procmgr-binary",
-				Args: []string{
-					filepath.Join(layersDir, "php-start", "procs.yml"),
-				},
-				Default: true,
-				Direct:  true,
-			}))
-
-			Expect(result.Layers[0].Name).To(Equal("php-start"))
-			Expect(result.Layers[0].Path).To(Equal(filepath.Join(layersDir, "php-start")))
-			Expect(result.Layers[0].Launch).To(BeTrue())
-			Expect(result.Layers[0].Build).To(BeFalse())
-
-			Expect(procMgr.AddCall.CallCount).To(Equal(1))
-			Expect(procMgr.AddCall.Receives.Name).To(Equal("httpd"))
-			Expect(procMgr.AddCall.Receives.Proc.Command).To(Equal("httpd"))
-			Expect(procMgr.AddCall.Receives.Proc.Args).To(Equal([]string{
-				"-f",
-				"httpd-conf-path",
-				"-k",
-				"start",
-				"-DFOREGROUND",
-			}))
-
-			Expect(procMgr.WriteFileCall.Receives.Path).To(Equal(filepath.Join(layersDir, "php-start", "procs.yml")))
-			Expect(buffer.String()).To(ContainSubstring("Determining start commands to include in procs.yml:"))
-			Expect(buffer.String()).To(ContainSubstring("HTTPD: httpd -f httpd-conf-path -k start -DFOREGROUND"))
-			Expect(buffer.String()).ToNot(ContainSubstring("FPM: php-fpm -y fpm-conf-path -c phprc-path"))
-		})
 	})
 
 	context("the PHP_HTTPD, PHP_FPM_PATH, and PHPRC env vars are set", func() {
@@ -156,23 +104,118 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 
 			Expect(procMgr.AddCall.CallCount).To(Equal(2))
 
-			// can't check what procMgr.AddCall received first
-			Expect(procMgr.AddCall.Receives.Name).To(Equal("fpm"))
-			Expect(procMgr.AddCall.Receives.Proc.Command).To(Equal("php-fpm"))
-			Expect(procMgr.AddCall.Receives.Proc.Args).To(Equal([]string{
-				"-y",
-				"fpm-conf-path",
-				"-c",
-				"phprc-path",
-			}))
+			expectedProcesses := map[string]phpstart.Proc{
+				"fpm": phpstart.Proc{
+					Command: "php-fpm",
+					Args: []string{
+						"-y",
+						"fpm-conf-path",
+						"-c",
+						"phprc-path",
+					},
+				},
+				"httpd": phpstart.Proc{
+					Command: "httpd",
+					Args: []string{
+						"-f",
+						"httpd-conf-path",
+						"-k",
+						"start",
+						"-DFOREGROUND",
+					},
+				},
+			}
+			Expect(processes).To(Equal(expectedProcesses))
 
 			Expect(procMgr.WriteFileCall.Receives.Path).To(Equal(filepath.Join(layersDir, "php-start", "procs.yml")))
 			Expect(buffer.String()).To(ContainSubstring("Determining start commands to include in procs.yml:"))
 			Expect(buffer.String()).To(ContainSubstring("FPM: php-fpm -y fpm-conf-path -c phprc-path"))
+			Expect(buffer.String()).To(ContainSubstring("HTTPD: httpd -f httpd-conf-path -k start -DFOREGROUND"))
+		})
+	})
+
+	context("the PHP_NGINX, PHP_FPM_PATH, and PHPRC env vars are set", func() {
+		it.Before(func() {
+			Expect(os.Setenv("PHP_NGINX_PATH", "nginx-conf-path")).To(Succeed())
+			Expect(os.Setenv("PHP_FPM_PATH", "fpm-conf-path")).To(Succeed())
+			Expect(os.Setenv("PHPRC", "phprc-path")).To(Succeed())
+		})
+
+		it.After(func() {
+			Expect(os.Unsetenv("PHP_NGINX_PATH")).To(Succeed())
+			Expect(os.Unsetenv("PHP_FPM_PATH")).To(Succeed())
+			Expect(os.Unsetenv("PHPRC")).To(Succeed())
+		})
+
+		it("returns a result that starts an NGINX process and an FPM process", func() {
+			result, err := build(packit.BuildContext{
+				WorkingDir: workingDir,
+				CNBPath:    cnbDir,
+				Stack:      "some-stack",
+				BuildpackInfo: packit.BuildpackInfo{
+					Name:    "Some Buildpack",
+					Version: "some-version",
+				},
+				Plan: packit.BuildpackPlan{
+					Entries: []packit.BuildpackPlanEntry{},
+				},
+				Layers: packit.Layers{Path: layersDir},
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(result.Launch.Processes[0]).To(Equal(packit.Process{
+				Type:    "web",
+				Command: "procmgr-binary",
+				Args: []string{
+					filepath.Join(layersDir, "php-start", "procs.yml"),
+				},
+				Default: true,
+				Direct:  true,
+			}))
+
+			Expect(procMgr.AddCall.CallCount).To(Equal(2))
+
+			expectedProcesses := map[string]phpstart.Proc{
+				"fpm": phpstart.Proc{
+					Command: "php-fpm",
+					Args: []string{
+						"-y",
+						"fpm-conf-path",
+						"-c",
+						"phprc-path",
+					},
+				},
+				"nginx": phpstart.Proc{
+					Command: "nginx",
+					Args: []string{
+						"-p",
+						workingDir,
+						"-c",
+						"nginx-conf-path",
+					},
+				},
+			}
+			Expect(processes).To(Equal(expectedProcesses))
+
+			Expect(procMgr.WriteFileCall.Receives.Path).To(Equal(filepath.Join(layersDir, "php-start", "procs.yml")))
+			Expect(buffer.String()).To(ContainSubstring("Determining start commands to include in procs.yml:"))
+			Expect(buffer.String()).To(ContainSubstring("FPM: php-fpm -y fpm-conf-path -c phprc-path"))
+			Expect(buffer.String()).To(ContainSubstring(fmt.Sprintf("Nginx: nginx -p %s -c nginx-conf-path", workingDir)))
 		})
 	})
 
 	context("failure cases", func() {
+		it.Before(func() {
+			Expect(os.Setenv("PHP_HTTPD_PATH", "httpd-conf-path")).To(Succeed())
+			Expect(os.Setenv("PHP_FPM_PATH", "fpm-conf-path")).To(Succeed())
+			Expect(os.Setenv("PHPRC", "phprc-path")).To(Succeed())
+		})
+
+		it.After(func() {
+			Expect(os.Unsetenv("PHP_HTTPD_PATH")).To(Succeed())
+			Expect(os.Unsetenv("PHP_FPM_PATH")).To(Succeed())
+			Expect(os.Unsetenv("PHPRC")).To(Succeed())
+		})
 
 		context("the php-start layer cannot be gotten", func() {
 			it.Before(func() {
@@ -224,13 +267,129 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 			})
 		})
 
-		context("the PHP_FPM_PATH is set but PHPRC is not", func() {
+		context("neither PHP_HTTPD_PATH nor PHP_NGINX_PATH are set", func() {
 			it.Before(func() {
-				Expect(os.Setenv("PHP_FPM_PATH", "fpm-conf-path")).To(Succeed())
+				Expect(os.Unsetenv("PHP_HTTPD_PATH")).To(Succeed())
+				Expect(os.Unsetenv("PHP_NGINX_PATH")).To(Succeed())
 			})
 
+			it("returns an error", func() {
+				_, err := build(packit.BuildContext{
+					WorkingDir: workingDir,
+					CNBPath:    cnbDir,
+					Stack:      "some-stack",
+					BuildpackInfo: packit.BuildpackInfo{
+						Name:    "Some Buildpack",
+						Version: "some-version",
+					},
+					Plan: packit.BuildpackPlan{
+						Entries: []packit.BuildpackPlanEntry{},
+					},
+					Layers: packit.Layers{Path: layersDir},
+				})
+
+				Expect(err).To(MatchError(ContainSubstring("need exactly one of: $PHP_HTTPD_PATH or $PHP_NGINX_PATH")))
+			})
+		})
+
+		context("both PHP_HTTPD_PATH and PHP_NGINX_PATH are set", func() {
+			it.Before(func() {
+				Expect(os.Setenv("PHP_HTTPD_PATH", "some value")).To(Succeed())
+				Expect(os.Setenv("PHP_NGINX_PATH", "some other value")).To(Succeed())
+			})
 			it.After(func() {
+				Expect(os.Unsetenv("PHP_NGINX_PATH")).To(Succeed())
+			})
+
+			it("returns an error", func() {
+				_, err := build(packit.BuildContext{
+					WorkingDir: workingDir,
+					CNBPath:    cnbDir,
+					Stack:      "some-stack",
+					BuildpackInfo: packit.BuildpackInfo{
+						Name:    "Some Buildpack",
+						Version: "some-version",
+					},
+					Plan: packit.BuildpackPlan{
+						Entries: []packit.BuildpackPlanEntry{},
+					},
+					Layers: packit.Layers{Path: layersDir},
+				})
+
+				Expect(err).To(MatchError(ContainSubstring("need exactly one of: $PHP_HTTPD_PATH or $PHP_NGINX_PATH")))
+			})
+		})
+
+		context("the PHP_FPM_PATH env var is NOT set", func() {
+			it.Before(func() {
 				Expect(os.Unsetenv("PHP_FPM_PATH")).To(Succeed())
+			})
+
+			it("returns an error", func() {
+				_, err := build(packit.BuildContext{
+					WorkingDir: workingDir,
+					CNBPath:    cnbDir,
+					Stack:      "some-stack",
+					BuildpackInfo: packit.BuildpackInfo{
+						Name:    "Some Buildpack",
+						Version: "some-version",
+					},
+					Plan: packit.BuildpackPlan{
+						Entries: []packit.BuildpackPlanEntry{},
+					},
+					Layers: packit.Layers{Path: layersDir},
+				})
+
+				Expect(err).To(MatchError(ContainSubstring("failed to lookup $PHP_FPM_PATH")))
+			})
+		})
+
+		context("the PHP_FPM_PATH env var is set but empty", func() {
+			it.Before(func() {
+				Expect(os.Setenv("PHP_FPM_PATH", "")).To(Succeed())
+			})
+
+			it("returns an error", func() {
+				_, err := build(packit.BuildContext{
+					WorkingDir: workingDir,
+					CNBPath:    cnbDir,
+					Stack:      "some-stack",
+					BuildpackInfo: packit.BuildpackInfo{
+						Name:    "Some Buildpack",
+						Version: "some-version",
+					},
+					Plan: packit.BuildpackPlan{
+						Entries: []packit.BuildpackPlanEntry{},
+					},
+					Layers: packit.Layers{Path: layersDir},
+				})
+
+				Expect(err).To(MatchError(ContainSubstring("failed to lookup $PHP_FPM_PATH")))
+			})
+		})
+
+		context("the PHPRC env var is not set", func() {
+			it.Before(func() {
+				Expect(os.Unsetenv("PHPRC")).To(Succeed())
+			})
+
+			it("returns an error, since the PHPRC is needed for FPM start command", func() {
+				_, err := build(packit.BuildContext{
+					WorkingDir: workingDir,
+					CNBPath:    cnbDir,
+					BuildpackInfo: packit.BuildpackInfo{
+						Name:    "Some Buildpack",
+						Version: "some-version",
+					},
+					Layers: packit.Layers{Path: layersDir},
+				})
+				Expect(err).To(MatchError(ContainSubstring("failed to lookup $PHPRC path for FPM")))
+			})
+		})
+
+		context("the PHPRC env var is set but empty", func() {
+			it.Before(func() {
+				Expect(os.Setenv("PHPRC", "")).To(Succeed())
 			})
 
 			it("returns an error, since the PHPRC is needed for FPM start command", func() {

@@ -14,7 +14,7 @@ import (
 	. "github.com/paketo-buildpacks/occam/matchers"
 )
 
-func testDefault(t *testing.T, context spec.G, it spec.S) {
+func testHttpd(t *testing.T, context spec.G, it spec.S) {
 	var (
 		Expect     = NewWithT(t).Expect
 		Eventually = NewWithT(t).Eventually
@@ -26,7 +26,7 @@ func testDefault(t *testing.T, context spec.G, it spec.S) {
 	)
 
 	it.Before(func() {
-		pack = occam.NewPack()
+		pack = occam.NewPack().WithVerbose()
 		docker = occam.NewDocker()
 	})
 
@@ -79,14 +79,20 @@ func testDefault(t *testing.T, context spec.G, it spec.S) {
 					MatchRegexp(fmt.Sprintf(`%s \d+\.\d+\.\d+`, buildpackInfo.Buildpack.Name)),
 					"  Getting the layer associated with the server start command",
 					fmt.Sprintf("    /layers/%s/php-start", strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_")),
-					"",
+				))
+
+				Expect(logs).To(ContainLines(
 					"  Determining start commands to include in procs.yml:",
 					MatchRegexp(`    HTTPD: httpd -f \/layers\/.*\/.*\/httpd.conf -k start -DFOREGROUND`),
 					MatchRegexp(`    FPM: php-fpm -y \/layers\/.*\/.*\/base.conf -c \/layers\/.*\/.*\/etc`),
 					fmt.Sprintf("    Writing process file to /layers/%s/php-start/procs.yml", strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_")),
-					"",
+				))
+
+				Expect(logs).To(ContainLines(
 					fmt.Sprintf("  Copying procmgr-binary into /layers/%s/php-start/bin/procmgr-binary", strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_")),
-					"",
+				))
+
+				Expect(logs).To(ContainLines(
 					"  Assigning launch processes:",
 					fmt.Sprintf("    web (default): procmgr-binary /layers/%s/php-start/procs.yml", strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_")),
 				))
@@ -98,18 +104,7 @@ func testDefault(t *testing.T, context spec.G, it spec.S) {
 					Execute(image.ID)
 				Expect(err).NotTo(HaveOccurred())
 
-				Eventually(func() string {
-					cLogs, err := docker.Container.Logs.Execute(container.ID)
-					Expect(err).NotTo(HaveOccurred())
-					return cLogs.String()
-				}).Should(
-					And(
-						MatchRegexp(`Apache\/\d+\.\d+\.\d+ \(Unix\) configured -- resuming normal operations`),
-						MatchRegexp(`fpm is running, pid \d+`),
-						ContainSubstring(`ready to handle connections`),
-					),
-				)
-				Eventually(container).Should(Serve(ContainSubstring("Hello World!")).OnPort(8080))
+				Eventually(container).Should(Serve(ContainSubstring("SUCCESS: date loads.")).OnPort(8080).WithEndpoint("/index.php?date"))
 			})
 		})
 	})

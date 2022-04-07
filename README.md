@@ -1,16 +1,26 @@
 # PHP Start Cloud Native Buildpack
 ## `gcr.io/paketo-buildpacks/php-start`
 
-A Cloud Native Buildpack for running HTTPD, Nginx, and/or FPM start commands
-for PHP apps.
+A Cloud Native Buildpack for running HTTPD, Nginx, and FPM start commands for
+PHP apps.
 
 ## Behavior
 
 This buildpack will always participate if it's `requirements` are met. In the
 HTTPD server case `requires` `php`, `php-fpm` optionally, `httpd`, and
-`httpd-config`. In the Nginx case, it will require `nginx` and `nginx-config`
-instead of `httpd` and `httpd-config`. These requirements will be met when used
-in conjunction with the other buildpacks in the Paketo PHP language family.
+`php-httpd-config`. In the Nginx case, it will require `nginx` and `php-nginx-config`
+instead of `httpd` and `php-httpd-config`.
+
+When this buildpack runs, the `PHP_HTTPD_PATH` OR the `PHP_NGINX_PATH`
+environment variable must be set  by another buildpack in conjunction with
+`PHP_FPM_PATH`. This is because both the HTTPD and Nginx web servers will
+require FPM to serve PHP apps. The build will fail if both `PHP_HTTPD_PATH` and
+`PHP_NGINX_PATH` are set or both unset, as well as if the `PHP_FPM_PATH`
+environment variable is not set. These requirements will be met when used in
+conjunction with the other buildpacks in the Paketo PHP language family.
+Because of this, the usage of this buildpack is fairly tightly coupled to other
+buildpacks in the PHP language family.
+
 
 | Requirement        | Build | Launch |
 |--------------------|-------|--------|
@@ -18,7 +28,6 @@ in conjunction with the other buildpacks in the Paketo PHP language family.
 | `php-fpm`          | x     | x      |
 | `httpd` or `nginx` | x     |        |
 | `httpd-config` or `nginx-config` | x     | x      |
-
 
 It will set the default start command to something that looks like:
 ```
