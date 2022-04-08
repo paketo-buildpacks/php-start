@@ -35,13 +35,13 @@ func Detect() packit.DetectFunc {
 	return func(context packit.DetectContext) (packit.DetectResult, error) {
 		baseRequirements := []packit.BuildPlanRequirement{
 			{
-				Name: "php",
+				Name: Php,
 				Metadata: BuildPlanMetadata{
 					Build: true,
 				},
 			},
 			{
-				Name: "php-fpm",
+				Name: PhpFpm,
 				Metadata: BuildPlanMetadata{
 					Build:  true,
 					Launch: true,
@@ -52,13 +52,31 @@ func Detect() packit.DetectFunc {
 		httpdFpmPlan := packit.BuildPlan{
 			Requires: []packit.BuildPlanRequirement{
 				{
-					Name: "httpd",
+					Name: Httpd,
 					Metadata: BuildPlanMetadata{
 						Launch: true,
 					},
 				},
 				{
-					Name: "httpd-config",
+					Name: PhpHttpdConfig,
+					Metadata: BuildPlanMetadata{
+						Build:  true,
+						Launch: true,
+					},
+				},
+			},
+		}
+
+		nginxFpmPlan := packit.BuildPlan{
+			Requires: []packit.BuildPlanRequirement{
+				{
+					Name: Nginx,
+					Metadata: BuildPlanMetadata{
+						Launch: true,
+					},
+				},
+				{
+					Name: PhpNginxConfig,
 					Metadata: BuildPlanMetadata{
 						Build:  true,
 						Launch: true,
@@ -68,12 +86,27 @@ func Detect() packit.DetectFunc {
 		}
 
 		httpdFpmPlan.Requires = append(baseRequirements, httpdFpmPlan.Requires...)
+		nginxFpmPlan.Requires = append(baseRequirements, nginxFpmPlan.Requires...)
 
-		// Eventually we can create a slice of plans that are Or'd together for
-		// HTTPD, Nginx, and the FPM included cases.
-		// See python-start detect phase as an example
+		plans := []packit.BuildPlan{httpdFpmPlan, nginxFpmPlan}
+
 		return packit.DetectResult{
-			Plan: httpdFpmPlan,
+			Plan: or(plans...),
 		}, nil
 	}
+}
+
+func or(plans ...packit.BuildPlan) packit.BuildPlan {
+	if len(plans) < 1 {
+		return packit.BuildPlan{}
+	}
+	combinedPlan := plans[0]
+
+	for i := range plans {
+		if i == 0 {
+			continue
+		}
+		combinedPlan.Or = append(combinedPlan.Or, plans[i])
+	}
+	return combinedPlan
 }
