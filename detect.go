@@ -1,7 +1,11 @@
 package phpstart
 
 import (
+	"os"
+	"path/filepath"
+
 	"github.com/paketo-buildpacks/packit/v2"
+	"github.com/paketo-buildpacks/packit/v2/fs"
 )
 
 // BuildPlanMetadata is the buildpack specific data included in build plan
@@ -47,6 +51,23 @@ func Detect() packit.DetectFunc {
 					Launch: true,
 				},
 			},
+		}
+
+		composerJsonPath := filepath.Join(context.WorkingDir, "composer.json")
+
+		if value, found := os.LookupEnv("COMPOSER"); found {
+			composerJsonPath = filepath.Join(context.WorkingDir, value)
+		}
+
+		if exists, err := fs.Exists(composerJsonPath); err != nil {
+			return packit.DetectResult{}, err
+		} else if exists {
+			baseRequirements = append(baseRequirements, packit.BuildPlanRequirement{
+				Name: "composer-packages",
+				Metadata: BuildPlanMetadata{
+					Launch: true,
+				},
+			})
 		}
 
 		httpdFpmPlan := packit.BuildPlan{

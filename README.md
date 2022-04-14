@@ -6,10 +6,13 @@ PHP apps.
 
 ## Behavior
 
-This buildpack will always participate if it's `requirements` are met. In the
+This buildpack will always participate if its `requirements` are met. In the
 HTTPD server case `requires` `php`, `php-fpm` optionally, `httpd`, and
 `php-httpd-config`. In the Nginx case, it will require `nginx` and `php-nginx-config`
 instead of `httpd` and `php-httpd-config`.
+
+In either the HTTPD server or Nginx case, this buildpack will require
+`composer-packages` when a `composer.json` file is available.
 
 When this buildpack runs, the `PHP_HTTPD_PATH` OR the `PHP_NGINX_PATH`
 environment variable must be set  by another buildpack in conjunction with
@@ -21,12 +24,12 @@ conjunction with the other buildpacks in the Paketo PHP language family.
 Because of this, the usage of this buildpack is fairly tightly coupled to other
 buildpacks in the PHP language family.
 
-
-| Requirement        | Build | Launch |
-|--------------------|-------|--------|
-| `php`              | x     |        |
-| `php-fpm`          | x     | x      |
-| `httpd` or `nginx` | x     |        |
+| Requirement                      | Build | Launch |
+|----------------------------------|-------|--------|
+| `php`                            | x     |        |
+| `composer-packages`              |       | x      |
+| `php-fpm`                        | x     | x      |
+| `httpd` or `nginx`               | x     |        |
 | `httpd-config` or `nginx-config` | x     | x      |
 
 It will set the default start command to something that looks like:
