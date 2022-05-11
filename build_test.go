@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -219,7 +218,7 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 
 		context("the php-start layer cannot be gotten", func() {
 			it.Before(func() {
-				Expect(ioutil.WriteFile(filepath.Join(layersDir, "php-start.toml"), nil, 0000)).To(Succeed())
+				Expect(os.WriteFile(filepath.Join(layersDir, "php-start.toml"), nil, 0000)).To(Succeed())
 			})
 			it("it returns an error", func() {
 				_, err := build(packit.BuildContext{
