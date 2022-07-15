@@ -98,6 +98,8 @@ func TestIntegration(t *testing.T) {
 
 	suite := spec.New("Integration", spec.Report(report.Terminal{}), spec.Parallel())
 	suite("Httpd", testHttpd)
+	suite("HttpdReload", testHttpdReload)
 	suite("Nginx", testNginx)
+	suite("NginxReload", testNginxReload)
 	suite.Run(t)
 }
