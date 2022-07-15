@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/paketo-buildpacks/libreload-packit"
 	"github.com/paketo-buildpacks/packit/v2"
 	"github.com/paketo-buildpacks/packit/v2/fs"
 )
@@ -20,6 +21,10 @@ type BuildPlanMetadata struct {
 	Build bool `toml:"build"`
 }
 
+type Reloader libreload.Reloader
+
+//go:generate faux --interface Reloader --output fakes/reloader.go
+
 // Detect will return a packit.DetectFunc that will be invoked during the
 // detect phase of the buildpack lifecycle.
 //
@@ -29,14 +34,15 @@ type BuildPlanMetadata struct {
 // and "httpd-config" are required at launch-time.
 // The second one for for Nginx in which "php", "php-fpm", "nginx"
 // and "nginx-config" are required at launch-time.
-
+//
 // This buildpack will always detect, and in the case of HTTPD, the buildpack
-// will provide and require `httpd-start`. In the case of Nginx, the buildpack
-// will provide and require `nginx-start`. This is unusual, but will allow the
+// will require `httpd-start`. In the case of Nginx, the buildpack
+// will require `nginx-start`. This is unusual, but will allow the
 // buildpack Build function access to which web server start command is needed,
 // since the requirements are not easily checked otherwise.
-func Detect() packit.DetectFunc {
+func Detect(reload Reloader) packit.DetectFunc {
 	return func(context packit.DetectContext) (packit.DetectResult, error) {
+
 		baseRequirements := []packit.BuildPlanRequirement{
 			{
 				Name: Php,
@@ -51,6 +57,17 @@ func Detect() packit.DetectFunc {
 					Launch: true,
 				},
 			},
+		}
+
+		if shouldEnableLiveReload, err := reload.ShouldEnableLiveReload(); err != nil {
+			return packit.DetectResult{}, err
+		} else if shouldEnableLiveReload {
+			baseRequirements = append(baseRequirements, packit.BuildPlanRequirement{
+				Name: "watchexec",
+				Metadata: BuildPlanMetadata{
+					Launch: true,
+				},
+			})
 		}
 
 		composerJsonPath := filepath.Join(context.WorkingDir, "composer.json")

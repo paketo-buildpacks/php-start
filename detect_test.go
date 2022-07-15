@@ -1,6 +1,7 @@
 package phpstart_test
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -9,12 +10,15 @@ import (
 	. "github.com/onsi/gomega/gstruct"
 	"github.com/paketo-buildpacks/packit/v2"
 	phpstart "github.com/paketo-buildpacks/php-start"
+	"github.com/paketo-buildpacks/php-start/fakes"
 	"github.com/sclevine/spec"
 )
 
 func testDetect(t *testing.T, context spec.G, it spec.S) {
 	var (
 		Expect = NewWithT(t).Expect
+
+		reloader *fakes.Reload
 
 		workingDir string
 		detect     packit.DetectFunc
@@ -25,7 +29,9 @@ func testDetect(t *testing.T, context spec.G, it spec.S) {
 		workingDir, err = os.MkdirTemp("", "working-dir")
 		Expect(err).NotTo(HaveOccurred())
 
-		detect = phpstart.Detect()
+		reloader = &fakes.Reload{}
+
+		detect = phpstart.Detect(reloader)
 	})
 
 	it.After(func() {
@@ -33,7 +39,7 @@ func testDetect(t *testing.T, context spec.G, it spec.S) {
 	})
 
 	context("Detect", func() {
-		it("requires php, php-fpm, httpd, httpd-conf, and httpd-start and provides httpd-start", func() {
+		it("requires php, php-fpm, httpd, httpd-conf, and httpd-start", func() {
 			result, err := detect(packit.DetectContext{
 				WorkingDir: workingDir,
 			})
@@ -103,6 +109,94 @@ func testDetect(t *testing.T, context spec.G, it spec.S) {
 			}))
 		})
 
+		context("when live reload is enabled", func() {
+			it.Before(func() {
+				reloader.ShouldEnableLiveReloadCall.Returns.Bool = true
+			})
+
+			it("requires php, php-fpm, httpd, httpd-conf, httpd-start, and watchexec", func() {
+				result, err := detect(packit.DetectContext{
+					WorkingDir: workingDir,
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(result.Plan).To(Equal(packit.BuildPlan{
+					Requires: []packit.BuildPlanRequirement{
+						{
+							Name: phpstart.Php,
+							Metadata: phpstart.BuildPlanMetadata{
+								Build: true,
+							},
+						},
+						{
+							Name: phpstart.PhpFpm,
+							Metadata: phpstart.BuildPlanMetadata{
+								Build:  true,
+								Launch: true,
+							},
+						},
+						{
+							Name: "watchexec",
+							Metadata: phpstart.BuildPlanMetadata{
+								Launch: true,
+							},
+						},
+						{
+							Name: phpstart.Httpd,
+							Metadata: phpstart.BuildPlanMetadata{
+								Launch: true,
+							},
+						},
+						{
+							Name: phpstart.PhpHttpdConfig,
+							Metadata: phpstart.BuildPlanMetadata{
+								Launch: true,
+								Build:  true,
+							},
+						},
+					},
+					Or: []packit.BuildPlan{
+						{
+							Requires: []packit.BuildPlanRequirement{
+								{
+									Name: phpstart.Php,
+									Metadata: phpstart.BuildPlanMetadata{
+										Build: true,
+									},
+								},
+								{
+									Name: phpstart.PhpFpm,
+									Metadata: phpstart.BuildPlanMetadata{
+										Build:  true,
+										Launch: true,
+									},
+								},
+								{
+									Name: "watchexec",
+									Metadata: phpstart.BuildPlanMetadata{
+										Launch: true,
+									},
+								},
+								{
+									Name: phpstart.Nginx,
+									Metadata: phpstart.BuildPlanMetadata{
+										Launch: true,
+									},
+								},
+								{
+									Name: phpstart.PhpNginxConfig,
+									Metadata: phpstart.BuildPlanMetadata{
+										Launch: true,
+										Build:  true,
+									},
+								},
+							},
+						},
+					},
+				}))
+			})
+		})
+
 		context("composer", func() {
 			context("with composer.json", func() {
 				it.Before(func() {
@@ -168,5 +262,20 @@ func testDetect(t *testing.T, context spec.G, it spec.S) {
 				})
 			})
 		}, spec.Sequential())
+
+		context("failure cases", func() {
+			context("when reloader.ShouldEnableLiveReload returns an error", func() {
+				it.Before(func() {
+					reloader.ShouldEnableLiveReloadCall.Returns.Error = errors.New("error from reloader")
+				})
+
+				it("returns an error", func() {
+					_, err := detect(packit.DetectContext{
+						WorkingDir: workingDir,
+					})
+					Expect(err).To(MatchError("error from reloader"))
+				})
+			})
+		})
 	})
 }
