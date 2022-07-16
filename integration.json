@@ -5,5 +5,6 @@
   "httpd" : "github.com/paketo-buildpacks/httpd",
   "php-httpd" : "github.com/paketo-buildpacks/php-httpd",
   "nginx" : "github.com/paketo-buildpacks/nginx",
-  "php-nginx" : "github.com/paketo-buildpacks/php-nginx"
+  "php-nginx" : "github.com/paketo-buildpacks/php-nginx",
+  "watchexec" : "github.com/paketo-buildpacks/watchexec"
 }
