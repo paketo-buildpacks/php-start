@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/paketo-buildpacks/libreload-packit"
 	"github.com/paketo-buildpacks/packit/v2"
 	"github.com/paketo-buildpacks/packit/v2/fs"
 	"github.com/paketo-buildpacks/packit/v2/scribe"
@@ -28,7 +29,7 @@ type ProcMgr interface {
 // of processes to run, since there are multiple process that could be run. The
 // layer is available at and launch-time, and its contents are used in the
 // image launch process.
-func Build(procs ProcMgr, logger scribe.Emitter) packit.BuildFunc {
+func Build(procs ProcMgr, logger scribe.Emitter, reloader Reloader) packit.BuildFunc {
 	return func(context packit.BuildContext) (packit.BuildResult, error) {
 		logger.Title("%s %s", context.BuildpackInfo.Name, context.BuildpackInfo.Version)
 
@@ -105,15 +106,27 @@ func Build(procs ProcMgr, logger scribe.Emitter) packit.BuildFunc {
 			return packit.BuildResult{}, fmt.Errorf("failed to copy procmgr-binary into layer: %w", err)
 		}
 
-		processes := []packit.Process{
-			{
-				Type:    "web",
-				Command: "procmgr-binary",
-				Args:    []string{filepath.Join(layer.Path, "procs.yml")},
-				Default: true,
-				Direct:  true,
-			},
+		procmgrBinaryProcess := packit.Process{
+			Type:    "web",
+			Command: "procmgr-binary",
+			Args:    []string{filepath.Join(layer.Path, "procs.yml")},
+			Default: true,
+			Direct:  true,
 		}
+
+		processes := make([]packit.Process, 0)
+
+		if shouldEnableLiveReload, err := reloader.ShouldEnableLiveReload(); err != nil {
+			return packit.BuildResult{}, err
+		} else if shouldEnableLiveReload {
+			nonReloadableProcess, reloadableProcess := reloader.TransformReloadableProcesses(procmgrBinaryProcess, libreload.ReloadableProcessSpec{
+				WatchPaths: []string{context.WorkingDir},
+			})
+			processes = append(processes, nonReloadableProcess, reloadableProcess)
+		} else {
+			processes = append(processes, procmgrBinaryProcess)
+		}
+
 		logger.LaunchProcesses(processes)
 
 		return packit.BuildResult{

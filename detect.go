@@ -40,7 +40,7 @@ type Reloader libreload.Reloader
 // will require `nginx-start`. This is unusual, but will allow the
 // buildpack Build function access to which web server start command is needed,
 // since the requirements are not easily checked otherwise.
-func Detect(reload Reloader) packit.DetectFunc {
+func Detect(reloader Reloader) packit.DetectFunc {
 	return func(context packit.DetectContext) (packit.DetectResult, error) {
 
 		baseRequirements := []packit.BuildPlanRequirement{
@@ -59,7 +59,7 @@ func Detect(reload Reloader) packit.DetectFunc {
 			},
 		}
 
-		if shouldEnableLiveReload, err := reload.ShouldEnableLiveReload(); err != nil {
+		if shouldEnableLiveReload, err := reloader.ShouldEnableLiveReload(); err != nil {
 			return packit.DetectResult{}, err
 		} else if shouldEnableLiveReload {
 			baseRequirements = append(baseRequirements, packit.BuildPlanRequirement{

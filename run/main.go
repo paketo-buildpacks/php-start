@@ -13,8 +13,9 @@ func main() {
 	procMgr := phpstart.NewProcs()
 	logEmitter := scribe.NewEmitter(os.Stdout).WithLevel(os.Getenv("BP_LOG_LEVEL"))
 
+	reloader := watchexec.NewWatchexecReloader()
 	packit.Run(
-		phpstart.Detect(watchexec.NewWatchexecReloader()),
-		phpstart.Build(procMgr, logEmitter),
+		phpstart.Detect(reloader),
+		phpstart.Build(procMgr, logEmitter, reloader),
 	)
 }

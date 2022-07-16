@@ -18,7 +18,7 @@ func testDetect(t *testing.T, context spec.G, it spec.S) {
 	var (
 		Expect = NewWithT(t).Expect
 
-		reloader *fakes.Reload
+		reloader *fakes.Reloader
 
 		workingDir string
 		detect     packit.DetectFunc
@@ -29,7 +29,7 @@ func testDetect(t *testing.T, context spec.G, it spec.S) {
 		workingDir, err = os.MkdirTemp("", "working-dir")
 		Expect(err).NotTo(HaveOccurred())
 
-		reloader = &fakes.Reload{}
+		reloader = &fakes.Reloader{}
 
 		detect = phpstart.Detect(reloader)
 	})

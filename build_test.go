@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/paketo-buildpacks/libreload-packit"
 	"github.com/paketo-buildpacks/packit/v2"
 	"github.com/paketo-buildpacks/packit/v2/scribe"
 	phpstart "github.com/paketo-buildpacks/php-start"
@@ -27,6 +28,7 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 
 		buffer    *bytes.Buffer
 		procMgr   *fakes.ProcMgr
+		reloader  *fakes.Reloader
 		processes map[string]phpstart.Proc
 
 		buildContext packit.BuildContext
@@ -55,6 +57,8 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 			processes[procName] = newProc
 		}
 
+		reloader = &fakes.Reloader{}
+
 		buildContext = packit.BuildContext{
 			WorkingDir: workingDir,
 			CNBPath:    cnbDir,
@@ -68,7 +72,7 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 			},
 			Layers: packit.Layers{Path: layersDir},
 		}
-		build = phpstart.Build(procMgr, logEmitter)
+		build = phpstart.Build(procMgr, logEmitter, reloader)
 	})
 
 	it.After(func() {
@@ -78,10 +82,34 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 	})
 
 	context("the PHP_HTTPD, PHP_FPM_PATH, and PHPRC env vars are set", func() {
+		var expectedProcesses map[string]phpstart.Proc
+
 		it.Before(func() {
 			Expect(os.Setenv("PHP_HTTPD_PATH", "httpd-conf-path")).To(Succeed())
 			Expect(os.Setenv("PHP_FPM_PATH", "fpm-conf-path")).To(Succeed())
 			Expect(os.Setenv("PHPRC", "phprc-path")).To(Succeed())
+
+			expectedProcesses = map[string]phpstart.Proc{
+				"fpm": {
+					Command: "php-fpm",
+					Args: []string{
+						"-y",
+						"fpm-conf-path",
+						"-c",
+						"phprc-path",
+					},
+				},
+				"httpd": {
+					Command: "httpd",
+					Args: []string{
+						"-f",
+						"httpd-conf-path",
+						"-k",
+						"start",
+						"-DFOREGROUND",
+					},
+				},
+			}
 		})
 
 		it.After(func() {
@@ -105,8 +133,61 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 			}))
 
 			Expect(procMgr.AddCall.CallCount).To(Equal(2))
+			Expect(processes).To(Equal(expectedProcesses))
 
-			expectedProcesses := map[string]phpstart.Proc{
+			Expect(procMgr.WriteFileCall.Receives.Path).To(Equal(filepath.Join(layersDir, "php-start", "procs.yml")))
+			Expect(buffer.String()).To(ContainSubstring("Determining start commands to include in procs.yml:"))
+			Expect(buffer.String()).To(ContainSubstring("FPM: php-fpm -y fpm-conf-path -c phprc-path"))
+			Expect(buffer.String()).To(ContainSubstring("HTTPD: httpd -f httpd-conf-path -k start -DFOREGROUND"))
+		})
+
+		context("when live reload is enabled", func() {
+			it.Before(func() {
+				reloader.ShouldEnableLiveReloadCall.Returns.Bool = true
+				reloader.TransformReloadableProcessesCall.Returns.NonReloadable = packit.Process{
+					Type: "fake-non-reloadable",
+				}
+				reloader.TransformReloadableProcessesCall.Returns.Reloadable = packit.Process{
+					Type: "fake-reloadable",
+				}
+			})
+
+			it("uses the processes from reloader.TransformReloadableProcessesCall", func() {
+				result, err := build(buildContext)
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(reloader.TransformReloadableProcessesCall.Receives.OriginalProcess).To(Equal(packit.Process{
+					Type:    "web",
+					Command: "procmgr-binary",
+					Args:    []string{filepath.Join(layersDir, "php-start", "procs.yml")},
+					Default: true,
+					Direct:  true,
+				}))
+
+				Expect(reloader.TransformReloadableProcessesCall.Receives.Spec).To(Equal(libreload.ReloadableProcessSpec{
+					WatchPaths: []string{workingDir},
+				}))
+
+				Expect(result.Launch.Processes).To(Equal([]packit.Process{
+					{Type: "fake-non-reloadable"},
+					{Type: "fake-reloadable"},
+				}))
+
+				Expect(procMgr.AddCall.CallCount).To(Equal(2))
+				Expect(processes).To(Equal(expectedProcesses))
+			})
+		})
+	})
+
+	context("the PHP_NGINX, PHP_FPM_PATH, and PHPRC env vars are set", func() {
+		var expectedProcesses map[string]phpstart.Proc
+
+		it.Before(func() {
+			Expect(os.Setenv("PHP_NGINX_PATH", "nginx-conf-path")).To(Succeed())
+			Expect(os.Setenv("PHP_FPM_PATH", "fpm-conf-path")).To(Succeed())
+			Expect(os.Setenv("PHPRC", "phprc-path")).To(Succeed())
+
+			expectedProcesses = map[string]phpstart.Proc{
 				"fpm": phpstart.Proc{
 					Command: "php-fpm",
 					Args: []string{
@@ -116,31 +197,16 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 						"phprc-path",
 					},
 				},
-				"httpd": phpstart.Proc{
-					Command: "httpd",
+				"nginx": phpstart.Proc{
+					Command: "nginx",
 					Args: []string{
-						"-f",
-						"httpd-conf-path",
-						"-k",
-						"start",
-						"-DFOREGROUND",
+						"-p",
+						workingDir,
+						"-c",
+						"nginx-conf-path",
 					},
 				},
 			}
-			Expect(processes).To(Equal(expectedProcesses))
-
-			Expect(procMgr.WriteFileCall.Receives.Path).To(Equal(filepath.Join(layersDir, "php-start", "procs.yml")))
-			Expect(buffer.String()).To(ContainSubstring("Determining start commands to include in procs.yml:"))
-			Expect(buffer.String()).To(ContainSubstring("FPM: php-fpm -y fpm-conf-path -c phprc-path"))
-			Expect(buffer.String()).To(ContainSubstring("HTTPD: httpd -f httpd-conf-path -k start -DFOREGROUND"))
-		})
-	})
-
-	context("the PHP_NGINX, PHP_FPM_PATH, and PHPRC env vars are set", func() {
-		it.Before(func() {
-			Expect(os.Setenv("PHP_NGINX_PATH", "nginx-conf-path")).To(Succeed())
-			Expect(os.Setenv("PHP_FPM_PATH", "fpm-conf-path")).To(Succeed())
-			Expect(os.Setenv("PHPRC", "phprc-path")).To(Succeed())
 		})
 
 		it.After(func() {
@@ -164,33 +230,49 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 			}))
 
 			Expect(procMgr.AddCall.CallCount).To(Equal(2))
-
-			expectedProcesses := map[string]phpstart.Proc{
-				"fpm": phpstart.Proc{
-					Command: "php-fpm",
-					Args: []string{
-						"-y",
-						"fpm-conf-path",
-						"-c",
-						"phprc-path",
-					},
-				},
-				"nginx": phpstart.Proc{
-					Command: "nginx",
-					Args: []string{
-						"-p",
-						workingDir,
-						"-c",
-						"nginx-conf-path",
-					},
-				},
-			}
 			Expect(processes).To(Equal(expectedProcesses))
 
 			Expect(procMgr.WriteFileCall.Receives.Path).To(Equal(filepath.Join(layersDir, "php-start", "procs.yml")))
 			Expect(buffer.String()).To(ContainSubstring("Determining start commands to include in procs.yml:"))
 			Expect(buffer.String()).To(ContainSubstring("FPM: php-fpm -y fpm-conf-path -c phprc-path"))
 			Expect(buffer.String()).To(ContainSubstring(fmt.Sprintf("Nginx: nginx -p %s -c nginx-conf-path", workingDir)))
+		})
+
+		context("when live reload is enabled", func() {
+			it.Before(func() {
+				reloader.ShouldEnableLiveReloadCall.Returns.Bool = true
+				reloader.TransformReloadableProcessesCall.Returns.NonReloadable = packit.Process{
+					Type: "fake-non-reloadable",
+				}
+				reloader.TransformReloadableProcessesCall.Returns.Reloadable = packit.Process{
+					Type: "fake-reloadable",
+				}
+			})
+
+			it("uses the processes from reloader.TransformReloadableProcessesCall", func() {
+				result, err := build(buildContext)
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(reloader.TransformReloadableProcessesCall.Receives.OriginalProcess).To(Equal(packit.Process{
+					Type:    "web",
+					Command: "procmgr-binary",
+					Args:    []string{filepath.Join(layersDir, "php-start", "procs.yml")},
+					Default: true,
+					Direct:  true,
+				}))
+
+				Expect(reloader.TransformReloadableProcessesCall.Receives.Spec).To(Equal(libreload.ReloadableProcessSpec{
+					WatchPaths: []string{workingDir},
+				}))
+
+				Expect(result.Launch.Processes).To(Equal([]packit.Process{
+					{Type: "fake-non-reloadable"},
+					{Type: "fake-reloadable"},
+				}))
+
+				Expect(procMgr.AddCall.CallCount).To(Equal(2))
+				Expect(processes).To(Equal(expectedProcesses))
+			})
 		})
 	})
 
@@ -327,6 +409,17 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 			it("returns an error", func() {
 				_, err := build(buildContext)
 				Expect(err).To(MatchError(ContainSubstring("failed to copy procmgr-binary into layer:")))
+			})
+		})
+
+		context("when reloader.ShouldEnableLiveReload returns an error", func() {
+			it.Before(func() {
+				reloader.ShouldEnableLiveReloadCall.Returns.Error = errors.New("error from reloader")
+			})
+
+			it("returns an error", func() {
+				_, err := build(buildContext)
+				Expect(err).To(MatchError("error from reloader"))
 			})
 		})
 	})
