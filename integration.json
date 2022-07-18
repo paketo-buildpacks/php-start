@@ -4,6 +4,6 @@
   "php-fpm" : "github.com/paketo-buildpacks/php-fpm",
   "httpd" : "github.com/paketo-buildpacks/httpd",
   "php-httpd" : "github.com/paketo-buildpacks/php-httpd",
-  "nginx" : "github.com/paketo-buildpacks/nginx",
+  "nginx" : "github.com/joshuatcasey/nginx",
   "php-nginx" : "github.com/paketo-buildpacks/php-nginx"
 }

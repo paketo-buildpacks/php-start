@@ -71,6 +71,7 @@ func testNginx(t *testing.T, context spec.G, it spec.S) {
 					WithEnv(map[string]string{
 						"BP_LOG_LEVEL":  "DEBUG",
 						"BP_PHP_SERVER": "nginx",
+						"BP_WEB_SERVER": "nginx",
 					}).
 					Execute(name, source)
 				Expect(err).ToNot(HaveOccurred(), logs.String)
