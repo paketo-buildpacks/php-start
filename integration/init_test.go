@@ -106,5 +106,6 @@ func TestIntegration(t *testing.T) {
 	suite("Httpd", testHttpd)
 	suite("HttpdReload", testHttpdReload)
 	suite("Nginx", testNginx)
+	suite("NginxReload", testNginxReload)
 	suite.Run(t)
 }
