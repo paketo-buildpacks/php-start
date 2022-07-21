@@ -94,8 +94,7 @@ func testNginxReload(t *testing.T, context spec.G, it spec.S) {
 
 				Eventually(container).Should(Serve(ContainSubstring("SUCCESS: date loads.")).OnPort(8080).WithEndpoint("/index.php?date"))
 
-				var buffer *bytes.Buffer
-				buffer = bytes.NewBuffer(nil)
+				buffer := bytes.NewBuffer(nil)
 
 				err = pexec.NewExecutable("docker").Execute(pexec.Execution{
 					Args: []string{
