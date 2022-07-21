@@ -32,7 +32,7 @@ func testNginxReload(t *testing.T, context spec.G, it spec.S) {
 		docker = occam.NewDocker()
 	})
 
-	context("when the buildpack is run with pack build", func() {
+	context("when BP_LIVE_RELOAD_ENABLED is true", func() {
 		var (
 			image     occam.Image
 			container occam.Container
@@ -54,63 +54,61 @@ func testNginxReload(t *testing.T, context spec.G, it spec.S) {
 			Expect(os.RemoveAll(source)).To(Succeed())
 		})
 
-		context("NGINX and FPM", func() {
-			it("successfully starts a PHP app with NGINX and FPM", func() {
-				var (
-					logs fmt.Stringer
-					err  error
-				)
+		it("successfully starts a reloadable PHP app with NGINX and FPM", func() {
+			var (
+				logs fmt.Stringer
+				err  error
+			)
 
-				image, logs, err = pack.WithNoColor().Build.
-					WithPullPolicy("never").
-					WithBuildpacks(
-						phpDistBuildpack,
-						phpFpmBuildpack,
-						nginxBuildpack,
-						phpNginxBuildpack,
-						watchexecBuildpack,
-						buildpack,
-					).
-					WithEnv(map[string]string{
-						"BP_LOG_LEVEL":           "DEBUG",
-						"BP_PHP_SERVER":          "nginx",
-						"BP_LIVE_RELOAD_ENABLED": "true",
-					}).
-					Execute(name, source)
-				Expect(err).ToNot(HaveOccurred(), logs.String)
+			image, logs, err = pack.WithNoColor().Build.
+				WithPullPolicy("never").
+				WithBuildpacks(
+					phpDistBuildpack,
+					phpFpmBuildpack,
+					nginxBuildpack,
+					phpNginxBuildpack,
+					watchexecBuildpack,
+					buildpack,
+				).
+				WithEnv(map[string]string{
+					"BP_LOG_LEVEL":           "DEBUG",
+					"BP_PHP_SERVER":          "nginx",
+					"BP_LIVE_RELOAD_ENABLED": "true",
+				}).
+				Execute(name, source)
+			Expect(err).ToNot(HaveOccurred(), logs.String)
 
-				Expect(logs).To(ContainLines(
-					"  Assigning launch processes:",
-					fmt.Sprintf("    web:                  procmgr-binary /layers/%s/php-start/procs.yml", strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_")),
-					fmt.Sprintf("    reload-web (default): watchexec --restart --watch /workspace --shell none -- procmgr-binary /layers/%s/php-start/procs.yml", strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_")),
-				))
+			Expect(logs).To(ContainLines(
+				"  Assigning launch processes:",
+				fmt.Sprintf("    web:                  procmgr-binary /layers/%s/php-start/procs.yml", strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_")),
+				fmt.Sprintf("    reload-web (default): watchexec --restart --watch /workspace --shell none -- procmgr-binary /layers/%s/php-start/procs.yml", strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_")),
+			))
 
-				container, err = docker.Container.Run.
-					WithEnv(map[string]string{"PORT": "8080"}).
-					WithPublish("8080").
-					WithPublishAll().
-					Execute(image.ID)
-				Expect(err).NotTo(HaveOccurred())
+			container, err = docker.Container.Run.
+				WithEnv(map[string]string{"PORT": "8080"}).
+				WithPublish("8080").
+				WithPublishAll().
+				Execute(image.ID)
+			Expect(err).NotTo(HaveOccurred())
 
-				Eventually(container).Should(Serve(ContainSubstring("SUCCESS: date loads.")).OnPort(8080).WithEndpoint("/index.php?date"))
+			Eventually(container).Should(Serve(ContainSubstring("SUCCESS: date loads.")).OnPort(8080).WithEndpoint("/index.php?date"))
 
-				buffer := bytes.NewBuffer(nil)
+			buffer := bytes.NewBuffer(nil)
 
-				err = pexec.NewExecutable("docker").Execute(pexec.Execution{
-					Args: []string{
-						"exec",
-						container.ID,
-						"/bin/bash",
-						"-c",
-						"sed -i 's/SUCCESS/RELOADED/g' /workspace/htdocs/index.php",
-					},
-					Stdout: buffer,
-					Stderr: buffer,
-				})
-				Expect(err).NotTo(HaveOccurred(), buffer.String())
-
-				Eventually(container).Should(Serve(ContainSubstring("RELOADED: date loads.")).OnPort(8080).WithEndpoint("/index.php?date"))
+			err = pexec.NewExecutable("docker").Execute(pexec.Execution{
+				Args: []string{
+					"exec",
+					container.ID,
+					"/bin/bash",
+					"-c",
+					"sed -i 's/SUCCESS/RELOADED/g' /workspace/htdocs/index.php",
+				},
+				Stdout: buffer,
+				Stderr: buffer,
 			})
+			Expect(err).NotTo(HaveOccurred(), buffer.String())
+
+			Eventually(container).Should(Serve(ContainSubstring("RELOADED: date loads.")).OnPort(8080).WithEndpoint("/index.php?date"))
 		})
 	})
 }
