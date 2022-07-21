@@ -45,6 +45,9 @@ commands and arguments for both `php-fpm` and the web-server.
 When the buildpack runs, you will see in the logs what processes are added to
 procs.yml.
 
+When environment variable `BP_LIVE_RELOAD_ENABLED` is set to `true`, this buildpack will
+use `watchexec` to create a reloadable process that will reload the application when changes
+happen to the application source code at `/workspace`.
 
 ## Integration
 
