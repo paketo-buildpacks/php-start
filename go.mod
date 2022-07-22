@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/BurntSushi/toml v1.2.0
 	github.com/onsi/gomega v1.20.0
-	github.com/paketo-buildpacks/libreload-packit v0.0.0-20220721104614-451a09a02928 // indirect
+	github.com/paketo-buildpacks/libreload-packit v0.0.0-20220721104614-451a09a02928
 	github.com/paketo-buildpacks/occam v0.9.0
 	github.com/paketo-buildpacks/packit/v2 v2.3.1
 	github.com/sclevine/spec v1.4.0
@@ -46,7 +46,7 @@ require (
 	github.com/testcontainers/testcontainers-go v0.13.0 // indirect
 	github.com/ulikunitz/xz v0.5.10 // indirect
 	go.opencensus.io v0.23.0 // indirect
-	golang.org/x/net v0.0.0-20220708220712-1185a9018129 // indirect
+	golang.org/x/net v0.0.0-20220722155237-a158d28d115b // indirect
 	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a // indirect
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/genproto v0.0.0-20220519153652-3a47de7e79bd // indirect
