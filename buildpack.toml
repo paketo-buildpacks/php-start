@@ -5,7 +5,7 @@ api = "0.7"
   homepage = "https://github.com/paketo-buildpacks/php-start"
   id = "paketo-buildpacks/php-start"
   keywords = ["php", "httpd", "nginx"]
-  name = "Paketo PHP Start Buildpack"
+  name = "Paketo Buildpack for PHP Start"
 
   [[buildpack.licenses]]
     type = "Apache-2.0"
