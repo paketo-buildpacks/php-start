@@ -21,15 +21,9 @@ func testDetect(t *testing.T, context spec.G, it spec.S) {
 	)
 
 	it.Before(func() {
-		var err error
-		workingDir, err = os.MkdirTemp("", "working-dir")
-		Expect(err).NotTo(HaveOccurred())
+		workingDir = t.TempDir()
 
 		detect = phpstart.Detect()
-	})
-
-	it.After(func() {
-		Expect(os.RemoveAll(workingDir)).To(Succeed())
 	})
 
 	context("Detect", func() {
@@ -126,11 +120,7 @@ func testDetect(t *testing.T, context spec.G, it spec.S) {
 
 			context("with $COMPOSER", func() {
 				it.Before(func() {
-					Expect(os.Setenv("COMPOSER", "some/other-file.json")).To(Succeed())
-				})
-
-				it.After(func() {
-					Expect(os.Unsetenv("COMPOSER")).To(Succeed())
+					t.Setenv("COMPOSER", "some/other-file.json")
 				})
 
 				context("that points to an existing file", func() {
