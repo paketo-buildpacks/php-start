@@ -29,7 +29,8 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 		procMgr   *fakes.ProcMgr
 		processes map[string]phpstart.Proc
 
-		build packit.BuildFunc
+		buildContext packit.BuildContext
+		build        packit.BuildFunc
 	)
 
 	it.Before(func() {
@@ -48,6 +49,20 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 		procMgr.AddCall.Stub = func(procName string, newProc phpstart.Proc) {
 			processes[procName] = newProc
 		}
+
+		buildContext = packit.BuildContext{
+			WorkingDir: workingDir,
+			CNBPath:    cnbDir,
+			Stack:      "some-stack",
+			BuildpackInfo: packit.BuildpackInfo{
+				Name:    "Some Buildpack",
+				Version: "some-version",
+			},
+			Plan: packit.BuildpackPlan{
+				Entries: []packit.BuildpackPlanEntry{},
+			},
+			Layers: packit.Layers{Path: layersDir},
+		}
 		build = phpstart.Build(procMgr, logEmitter)
 	})
 
@@ -59,19 +74,7 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 		})
 
 		it("returns a result that starts an HTTPD process and an FPM process", func() {
-			result, err := build(packit.BuildContext{
-				WorkingDir: workingDir,
-				CNBPath:    cnbDir,
-				Stack:      "some-stack",
-				BuildpackInfo: packit.BuildpackInfo{
-					Name:    "Some Buildpack",
-					Version: "some-version",
-				},
-				Plan: packit.BuildpackPlan{
-					Entries: []packit.BuildpackPlanEntry{},
-				},
-				Layers: packit.Layers{Path: layersDir},
-			})
+			result, err := build(buildContext)
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(result.Launch.Processes[0]).To(Equal(packit.Process{
@@ -124,19 +127,7 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 		})
 
 		it("returns a result that starts an NGINX process and an FPM process", func() {
-			result, err := build(packit.BuildContext{
-				WorkingDir: workingDir,
-				CNBPath:    cnbDir,
-				Stack:      "some-stack",
-				BuildpackInfo: packit.BuildpackInfo{
-					Name:    "Some Buildpack",
-					Version: "some-version",
-				},
-				Plan: packit.BuildpackPlan{
-					Entries: []packit.BuildpackPlanEntry{},
-				},
-				Layers: packit.Layers{Path: layersDir},
-			})
+			result, err := build(buildContext)
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(result.Launch.Processes[0]).To(Equal(packit.Process{
@@ -191,20 +182,9 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 			it.Before(func() {
 				Expect(os.WriteFile(filepath.Join(layersDir, "php-start.toml"), nil, 0000)).To(Succeed())
 			})
+
 			it("it returns an error", func() {
-				_, err := build(packit.BuildContext{
-					WorkingDir: workingDir,
-					CNBPath:    cnbDir,
-					Stack:      "some-stack",
-					BuildpackInfo: packit.BuildpackInfo{
-						Name:    "Some Buildpack",
-						Version: "some-version",
-					},
-					Plan: packit.BuildpackPlan{
-						Entries: []packit.BuildpackPlanEntry{},
-					},
-					Layers: packit.Layers{Path: layersDir},
-				})
+				_, err := build(buildContext)
 				Expect(err).To(MatchError(ContainSubstring("failed to parse layer content metadata:")))
 			})
 		})
@@ -220,19 +200,7 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 			})
 
 			it("returns an error", func() {
-				_, err := build(packit.BuildContext{
-					WorkingDir: workingDir,
-					CNBPath:    cnbDir,
-					Stack:      "some-stack",
-					BuildpackInfo: packit.BuildpackInfo{
-						Name:    "Some Buildpack",
-						Version: "some-version",
-					},
-					Plan: packit.BuildpackPlan{
-						Entries: []packit.BuildpackPlanEntry{},
-					},
-					Layers: packit.Layers{Path: layersDir},
-				})
+				_, err := build(buildContext)
 				Expect(err).To(MatchError(ContainSubstring("could not remove file")))
 			})
 		})
@@ -244,20 +212,7 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 			})
 
 			it("returns an error", func() {
-				_, err := build(packit.BuildContext{
-					WorkingDir: workingDir,
-					CNBPath:    cnbDir,
-					Stack:      "some-stack",
-					BuildpackInfo: packit.BuildpackInfo{
-						Name:    "Some Buildpack",
-						Version: "some-version",
-					},
-					Plan: packit.BuildpackPlan{
-						Entries: []packit.BuildpackPlanEntry{},
-					},
-					Layers: packit.Layers{Path: layersDir},
-				})
-
+				_, err := build(buildContext)
 				Expect(err).To(MatchError(ContainSubstring("need exactly one of: $PHP_HTTPD_PATH or $PHP_NGINX_PATH")))
 			})
 		})
@@ -269,20 +224,7 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 			})
 
 			it("returns an error", func() {
-				_, err := build(packit.BuildContext{
-					WorkingDir: workingDir,
-					CNBPath:    cnbDir,
-					Stack:      "some-stack",
-					BuildpackInfo: packit.BuildpackInfo{
-						Name:    "Some Buildpack",
-						Version: "some-version",
-					},
-					Plan: packit.BuildpackPlan{
-						Entries: []packit.BuildpackPlanEntry{},
-					},
-					Layers: packit.Layers{Path: layersDir},
-				})
-
+				_, err := build(buildContext)
 				Expect(err).To(MatchError(ContainSubstring("need exactly one of: $PHP_HTTPD_PATH or $PHP_NGINX_PATH")))
 			})
 		})
@@ -293,20 +235,7 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 			})
 
 			it("returns an error", func() {
-				_, err := build(packit.BuildContext{
-					WorkingDir: workingDir,
-					CNBPath:    cnbDir,
-					Stack:      "some-stack",
-					BuildpackInfo: packit.BuildpackInfo{
-						Name:    "Some Buildpack",
-						Version: "some-version",
-					},
-					Plan: packit.BuildpackPlan{
-						Entries: []packit.BuildpackPlanEntry{},
-					},
-					Layers: packit.Layers{Path: layersDir},
-				})
-
+				_, err := build(buildContext)
 				Expect(err).To(MatchError(ContainSubstring("failed to lookup $PHP_FPM_PATH")))
 			})
 		})
@@ -317,20 +246,7 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 			})
 
 			it("returns an error", func() {
-				_, err := build(packit.BuildContext{
-					WorkingDir: workingDir,
-					CNBPath:    cnbDir,
-					Stack:      "some-stack",
-					BuildpackInfo: packit.BuildpackInfo{
-						Name:    "Some Buildpack",
-						Version: "some-version",
-					},
-					Plan: packit.BuildpackPlan{
-						Entries: []packit.BuildpackPlanEntry{},
-					},
-					Layers: packit.Layers{Path: layersDir},
-				})
-
+				_, err := build(buildContext)
 				Expect(err).To(MatchError(ContainSubstring("failed to lookup $PHP_FPM_PATH")))
 			})
 		})
@@ -341,15 +257,7 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 			})
 
 			it("returns an error, since the PHPRC is needed for FPM start command", func() {
-				_, err := build(packit.BuildContext{
-					WorkingDir: workingDir,
-					CNBPath:    cnbDir,
-					BuildpackInfo: packit.BuildpackInfo{
-						Name:    "Some Buildpack",
-						Version: "some-version",
-					},
-					Layers: packit.Layers{Path: layersDir},
-				})
+				_, err := build(buildContext)
 				Expect(err).To(MatchError(ContainSubstring("failed to lookup $PHPRC path for FPM")))
 			})
 		})
@@ -360,15 +268,7 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 			})
 
 			it("returns an error, since the PHPRC is needed for FPM start command", func() {
-				_, err := build(packit.BuildContext{
-					WorkingDir: workingDir,
-					CNBPath:    cnbDir,
-					BuildpackInfo: packit.BuildpackInfo{
-						Name:    "Some Buildpack",
-						Version: "some-version",
-					},
-					Layers: packit.Layers{Path: layersDir},
-				})
+				_, err := build(buildContext)
 				Expect(err).To(MatchError(ContainSubstring("failed to lookup $PHPRC path for FPM")))
 			})
 		})
@@ -379,19 +279,7 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 			})
 
 			it("returns an error", func() {
-				_, err := build(packit.BuildContext{
-					WorkingDir: workingDir,
-					CNBPath:    cnbDir,
-					Stack:      "some-stack",
-					BuildpackInfo: packit.BuildpackInfo{
-						Name:    "Some Buildpack",
-						Version: "some-version",
-					},
-					Plan: packit.BuildpackPlan{
-						Entries: []packit.BuildpackPlanEntry{},
-					},
-					Layers: packit.Layers{Path: layersDir},
-				})
+				_, err := build(buildContext)
 				Expect(err).To(MatchError(ContainSubstring("failed to write procs.yml")))
 			})
 		})
@@ -406,19 +294,7 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 			})
 
 			it("returns an error", func() {
-				_, err := build(packit.BuildContext{
-					WorkingDir: workingDir,
-					CNBPath:    cnbDir,
-					Stack:      "some-stack",
-					BuildpackInfo: packit.BuildpackInfo{
-						Name:    "Some Buildpack",
-						Version: "some-version",
-					},
-					Plan: packit.BuildpackPlan{
-						Entries: []packit.BuildpackPlanEntry{},
-					},
-					Layers: packit.Layers{Path: layersDir},
-				})
+				_, err := build(buildContext)
 				Expect(err).To(MatchError(ContainSubstring("failed to copy procmgr-binary into layer:")))
 			})
 		})
