@@ -115,6 +115,13 @@ func testDetect(t *testing.T, context spec.G, it spec.S) {
 							Launch: true,
 						},
 					}))
+
+					Expect(result.Plan.Or[0].Requires).To(ContainElements(packit.BuildPlanRequirement{
+						Name: "composer-packages",
+						Metadata: phpstart.BuildPlanMetadata{
+							Launch: true,
+						},
+					}))
 				})
 			})
 
@@ -136,6 +143,13 @@ func testDetect(t *testing.T, context spec.G, it spec.S) {
 						Expect(err).NotTo(HaveOccurred())
 
 						Expect(result.Plan.Requires).To(ContainElements(packit.BuildPlanRequirement{
+							Name: "composer-packages",
+							Metadata: phpstart.BuildPlanMetadata{
+								Launch: true,
+							},
+						}))
+
+						Expect(result.Plan.Or[0].Requires).To(ContainElements(packit.BuildPlanRequirement{
 							Name: "composer-packages",
 							Metadata: phpstart.BuildPlanMetadata{
 								Launch: true,
