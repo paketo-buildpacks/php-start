@@ -15,6 +15,7 @@ type BuildPlanMetadata struct {
 	// Launch flag requests the given requirement be made available during the
 	// launch phase of the buildpack lifecycle.
 	Launch bool `toml:"launch"`
+
 	// Build flag requests the given requirement be made available during the
 	// build phase of the buildpack lifecycle.
 	Build bool `toml:"build"`
@@ -23,18 +24,21 @@ type BuildPlanMetadata struct {
 // Detect will return a packit.DetectFunc that will be invoked during the
 // detect phase of the buildpack lifecycle.
 //
-// This buildpack has a less-common provides/requires structure. There are two
-// main requirement groups:
-// One for HTTPD in which "php", "php-fpm", "httpd"
-// and "httpd-config" are required at launch-time.
-// The second one for for Nginx in which "php", "php-fpm", "nginx"
-// and "nginx-config" are required at launch-time.
-
-// This buildpack will always detect, and in the case of HTTPD, the buildpack
-// will provide and require `httpd-start`. In the case of Nginx, the buildpack
-// will provide and require `nginx-start`. This is unusual, but will allow the
-// buildpack Build function access to which web server start command is needed,
-// since the requirements are not easily checked otherwise.
+// This buildpack has two requirement groups:
+// One for HTTPD in which the following are required at launch time:
+// - "php"
+// - "php-fpm"
+// - "httpd"
+// - "httpd-config"
+// Another for HTTPD in which the following are required at launch time:
+// - "php"
+// - "php-fpm"
+// - "nginx"
+// - "nginx-config"
+//
+// Additionally, this buildpack will require 'composer-packages' when a composer.json is found.
+//
+// This buildpack will always detect.
 func Detect() packit.DetectFunc {
 	return func(context packit.DetectContext) (packit.DetectResult, error) {
 		baseRequirements := []packit.BuildPlanRequirement{
@@ -108,26 +112,10 @@ func Detect() packit.DetectFunc {
 
 		httpdFpmPlan.Requires = append(baseRequirements, httpdFpmPlan.Requires...)
 		nginxFpmPlan.Requires = append(baseRequirements, nginxFpmPlan.Requires...)
-
-		plans := []packit.BuildPlan{httpdFpmPlan, nginxFpmPlan}
+		httpdFpmPlan.Or = []packit.BuildPlan{nginxFpmPlan}
 
 		return packit.DetectResult{
-			Plan: or(plans...),
+			Plan: httpdFpmPlan,
 		}, nil
 	}
-}
-
-func or(plans ...packit.BuildPlan) packit.BuildPlan {
-	if len(plans) < 1 {
-		return packit.BuildPlan{}
-	}
-	combinedPlan := plans[0]
-
-	for i := range plans {
-		if i == 0 {
-			continue
-		}
-		combinedPlan.Or = append(combinedPlan.Or, plans[i])
-	}
-	return combinedPlan
 }

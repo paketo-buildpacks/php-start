@@ -33,7 +33,7 @@ func testDetect(t *testing.T, context spec.G, it spec.S) {
 	})
 
 	context("Detect", func() {
-		it("requires php, php-fpm, httpd, httpd-conf, and httpd-start and provides httpd-start", func() {
+		it("requires either [php, php-fpm, httpd, php-httpd-config] or [php, php-fpm, nginx, php-nginx-config]", func() {
 			result, err := detect(packit.DetectContext{
 				WorkingDir: workingDir,
 			})
