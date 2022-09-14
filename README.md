@@ -53,8 +53,8 @@ implicitly support live reloading of served files.
 This buildpack adds explicit live reload support for `httpd` and `nginx` configuration files
 at the following locations:
 
-- `http`: `<app-directory>/.httpd.conf.d/*.conf`
-- `nginx`: `<app-directory>/.nginx.conf.d/*.conf`
+- `http`: `<app-directory>/.httpd.conf.d/`
+- `nginx`: `<app-directory>/.nginx.conf.d/`
 
 See the following integration test files for examples of both application code live reload and configuration live reload.
 

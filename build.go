@@ -28,7 +28,7 @@ type ProcMgr interface {
 // of processes to run, since there are multiple process that could be run. The
 // layer is available at and launch-time, and its contents are used in the
 // image launch process.
-func Build(procs ProcMgr, logger scribe.Emitter) packit.BuildFunc {
+func Build(procs ProcMgr, logger scribe.Emitter, reloader Reloader) packit.BuildFunc {
 	return func(context packit.BuildContext) (packit.BuildResult, error) {
 		logger.Title("%s %s", context.BuildpackInfo.Name, context.BuildpackInfo.Version)
 
@@ -54,19 +54,60 @@ func Build(procs ProcMgr, logger scribe.Emitter) packit.BuildFunc {
 			return packit.BuildResult{}, errors.New("need exactly one of: $PHP_HTTPD_PATH or $PHP_NGINX_PATH")
 		}
 
+		shouldEnableReload, err := reloader.ShouldEnableLiveReload()
+		if err != nil {
+			return packit.BuildResult{}, err
+		}
+
 		logger.Process("Determining start commands to include in procs.yml:")
+		watchPaths := make([]string, 0)
 		// HTTPD Case
 		if httpdConfPath != "" {
 			serverProc := NewProc("httpd", []string{"-f", httpdConfPath, "-k", "start", "-DFOREGROUND"})
+
+			if exists, err := fs.Exists(filepath.Join(context.WorkingDir, ".httpd.conf.d")); err != nil {
+				return packit.BuildResult{}, err
+			} else if shouldEnableReload && exists {
+				serverProc = NewProc("watchexec", []string{
+					"--watch", "/workspace/.httpd.conf.d",
+					"--on-busy-update", "signal",
+					"--signal", "SIGHUP",
+					"--", "httpd",
+					"-f", httpdConfPath, "-k",
+					"start",
+					"-DFOREGROUND",
+				})
+			} else if shouldEnableReload && !exists {
+				logger.Subprocess("HTTPD will not be reloadable since .httpd.conf.d folder not found")
+			}
+
 			procs.Add("httpd", serverProc)
 			logger.Subprocess("HTTPD: %s %v", serverProc.Command, strings.Join(serverProc.Args, " "))
+			watchPaths = append(watchPaths, "/workspace/.httpd.conf.d")
 		}
 
 		// Nginx Case
 		if nginxConfPath != "" {
 			serverProc := NewProc("nginx", []string{"-p", context.WorkingDir, "-c", nginxConfPath})
+
+			if exists, err := fs.Exists(filepath.Join(context.WorkingDir, ".nginx.conf.d")); err != nil {
+				return packit.BuildResult{}, err
+			} else if shouldEnableReload && exists {
+				serverProc = NewProc("watchexec", []string{
+					"--watch", "/workspace/.nginx.conf.d",
+					"--on-busy-update", "signal",
+					"--signal", "SIGHUP",
+					"--", "nginx",
+					"-p", context.WorkingDir,
+					"-c", nginxConfPath,
+				})
+			} else if shouldEnableReload && !exists {
+				logger.Subprocess("NGINX will not be reloadable since .nginx.conf.d folder not found")
+			}
+
 			procs.Add("nginx", serverProc)
 			logger.Subprocess("Nginx: %s %v", serverProc.Command, strings.Join(serverProc.Args, " "))
+			watchPaths = append(watchPaths, "/workspace/.nginx.conf.d")
 		}
 
 		// FPM Case
@@ -80,6 +121,22 @@ func Build(procs ProcMgr, logger scribe.Emitter) packit.BuildFunc {
 			return packit.BuildResult{}, errors.New("failed to lookup $PHPRC path for FPM")
 		}
 		fpmProc := NewProc("php-fpm", []string{"-y", fpmConfPath, "-c", phprcPath})
+
+		if exists, err := fs.Exists(filepath.Join(context.WorkingDir, ".php.fpm.d")); err != nil {
+			return packit.BuildResult{}, err
+		} else if shouldEnableReload && exists {
+			fpmProc = NewProc("watchexec", []string{
+				"--watch", "/workspace/.php.fpm.d",
+				"--on-busy-update", "signal",
+				"--signal", "SIGHUP",
+				"--", "php-fpm",
+				"-y", fpmConfPath,
+				"-c", phprcPath,
+			})
+		} else if shouldEnableReload && !exists {
+			logger.Subprocess("FPM will not be reloadable since .php.fpm.d folder not found")
+		}
+
 		procs.Add("fpm", fpmProc)
 		logger.Subprocess("FPM: %s %v", fpmProc.Command, strings.Join(fpmProc.Args, " "))
 
@@ -105,15 +162,27 @@ func Build(procs ProcMgr, logger scribe.Emitter) packit.BuildFunc {
 			return packit.BuildResult{}, fmt.Errorf("failed to copy procmgr-binary into layer: %w", err)
 		}
 
-		processes := []packit.Process{
-			{
-				Type:    "web",
-				Command: "procmgr-binary",
-				Args:    []string{filepath.Join(layer.Path, "procs.yml")},
-				Default: true,
-				Direct:  true,
-			},
+		originalProcess := packit.Process{
+			Type:    "web",
+			Command: "procmgr-binary",
+			Args:    []string{filepath.Join(layer.Path, "procs.yml")},
+			Default: true,
+			Direct:  true,
 		}
+
+		processes := make([]packit.Process, 0)
+
+		if _, err := reloader.ShouldEnableLiveReload(); err != nil {
+			return packit.BuildResult{}, err
+			//} else if shouldEnableReload {
+			//	nonReloadableProcess, reloadableProcess := reloader.TransformReloadableProcesses(originalProcess, libreload.ReloadableProcessSpec{
+			//		WatchPaths: watchPaths,
+			//	})
+			//	processes = append(processes, nonReloadableProcess, reloadableProcess)
+		} else {
+			processes = append(processes, originalProcess)
+		}
+
 		logger.LaunchProcesses(processes)
 
 		return packit.BuildResult{
