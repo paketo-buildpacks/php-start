@@ -21,19 +21,13 @@ func testDetect(t *testing.T, context spec.G, it spec.S) {
 	)
 
 	it.Before(func() {
-		var err error
-		workingDir, err = os.MkdirTemp("", "working-dir")
-		Expect(err).NotTo(HaveOccurred())
+		workingDir = t.TempDir()
 
 		detect = phpstart.Detect()
 	})
 
-	it.After(func() {
-		Expect(os.RemoveAll(workingDir)).To(Succeed())
-	})
-
 	context("Detect", func() {
-		it("requires php, php-fpm, httpd, httpd-conf, and httpd-start and provides httpd-start", func() {
+		it("requires either [php, php-fpm, httpd, php-httpd-config] or [php, php-fpm, nginx, php-nginx-config]", func() {
 			result, err := detect(packit.DetectContext{
 				WorkingDir: workingDir,
 			})
@@ -121,16 +115,19 @@ func testDetect(t *testing.T, context spec.G, it spec.S) {
 							Launch: true,
 						},
 					}))
+
+					Expect(result.Plan.Or[0].Requires).To(ContainElements(packit.BuildPlanRequirement{
+						Name: "composer-packages",
+						Metadata: phpstart.BuildPlanMetadata{
+							Launch: true,
+						},
+					}))
 				})
 			})
 
 			context("with $COMPOSER", func() {
 				it.Before(func() {
-					Expect(os.Setenv("COMPOSER", "some/other-file.json")).To(Succeed())
-				})
-
-				it.After(func() {
-					Expect(os.Unsetenv("COMPOSER")).To(Succeed())
+					t.Setenv("COMPOSER", "some/other-file.json")
 				})
 
 				context("that points to an existing file", func() {
@@ -146,6 +143,13 @@ func testDetect(t *testing.T, context spec.G, it spec.S) {
 						Expect(err).NotTo(HaveOccurred())
 
 						Expect(result.Plan.Requires).To(ContainElements(packit.BuildPlanRequirement{
+							Name: "composer-packages",
+							Metadata: phpstart.BuildPlanMetadata{
+								Launch: true,
+							},
+						}))
+
+						Expect(result.Plan.Or[0].Requires).To(ContainElements(packit.BuildPlanRequirement{
 							Name: "composer-packages",
 							Metadata: phpstart.BuildPlanMetadata{
 								Launch: true,

@@ -42,7 +42,7 @@ on the container. This is done to allow for FPM to run on the container
 alongside the web server. The `procs.yml` file it runs with contains the
 commands and arguments for both `php-fpm` and the web-server.
 
-When the buildpack runs, you will see in the logs what processes are addded to
+When the buildpack runs, you will see in the logs what processes are added to
 procs.yml.
 
 
@@ -55,25 +55,27 @@ imagine that you would need to require it as dependency.
 
 To package this buildpack for consumption:
 
-```
+```shell
 $ ./scripts/package.sh --version <version-number>
 ```
 
 This will create a `buildpackage.cnb` file under the `build` directory which you
 can use to build your app as follows:
-```
-pack build <app-name> -p <path-to-app> -b build/buildpackage.cnb
+```shell
+pack build <app-name> \
+  --path <path-to-app> \
+  --buildpack build/buildpackage.cnb
 ```
 
 ## Run Tests
 
 To run all unit tests, run:
-```
+```shell
 ./scripts/unit.sh
 ```
 
 To run all integration tests, run:
-```
+```shell
 /scripts/integration.sh
 ```
 
