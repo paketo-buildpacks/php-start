@@ -112,10 +112,24 @@ func Detect() packit.DetectFunc {
 
 		httpdFpmPlan.Requires = append(baseRequirements, httpdFpmPlan.Requires...)
 		nginxFpmPlan.Requires = append(baseRequirements, nginxFpmPlan.Requires...)
-		httpdFpmPlan.Or = []packit.BuildPlan{nginxFpmPlan}
 
 		return packit.DetectResult{
-			Plan: httpdFpmPlan,
+			Plan: or(httpdFpmPlan, nginxFpmPlan),
 		}, nil
 	}
+}
+
+func or(plans ...packit.BuildPlan) packit.BuildPlan {
+	if len(plans) < 1 {
+		return packit.BuildPlan{}
+	}
+	combinedPlan := plans[0]
+
+	for i := range plans {
+		if i == 0 {
+			continue
+		}
+		combinedPlan.Or = append(combinedPlan.Or, plans[i])
+	}
+	return combinedPlan
 }
