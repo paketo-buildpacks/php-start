@@ -30,7 +30,7 @@ type BuildPlanMetadata struct {
 // - "php-fpm"
 // - "httpd"
 // - "httpd-config"
-// Another for HTTPD in which the following are required at launch time:
+// Another for NGINX in which the following are required at launch time:
 // - "php"
 // - "php-fpm"
 // - "nginx"
