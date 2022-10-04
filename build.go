@@ -60,7 +60,6 @@ func Build(procs ProcMgr, logger scribe.Emitter, reloader Reloader) packit.Build
 		}
 
 		logger.Process("Determining start commands to include in procs.yml:")
-		watchPaths := make([]string, 0)
 		// HTTPD Case
 		if httpdConfPath != "" {
 			serverProc := NewProc("httpd", []string{"-f", httpdConfPath, "-k", "start", "-DFOREGROUND"})
@@ -83,7 +82,6 @@ func Build(procs ProcMgr, logger scribe.Emitter, reloader Reloader) packit.Build
 
 			procs.Add("httpd", serverProc)
 			logger.Subprocess("HTTPD: %s %v", serverProc.Command, strings.Join(serverProc.Args, " "))
-			watchPaths = append(watchPaths, "/workspace/.httpd.conf.d")
 		}
 
 		// Nginx Case
@@ -107,7 +105,6 @@ func Build(procs ProcMgr, logger scribe.Emitter, reloader Reloader) packit.Build
 
 			procs.Add("nginx", serverProc)
 			logger.Subprocess("Nginx: %s %v", serverProc.Command, strings.Join(serverProc.Args, " "))
-			watchPaths = append(watchPaths, "/workspace/.nginx.conf.d")
 		}
 
 		// FPM Case
@@ -174,11 +171,6 @@ func Build(procs ProcMgr, logger scribe.Emitter, reloader Reloader) packit.Build
 
 		if _, err := reloader.ShouldEnableLiveReload(); err != nil {
 			return packit.BuildResult{}, err
-			//} else if shouldEnableReload {
-			//	nonReloadableProcess, reloadableProcess := reloader.TransformReloadableProcesses(originalProcess, libreload.ReloadableProcessSpec{
-			//		WatchPaths: watchPaths,
-			//	})
-			//	processes = append(processes, nonReloadableProcess, reloadableProcess)
 		} else {
 			processes = append(processes, originalProcess)
 		}
