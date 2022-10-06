@@ -77,7 +77,7 @@ func Build(procs ProcMgr, logger scribe.Emitter, reloader Reloader) packit.Build
 					"-DFOREGROUND",
 				})
 			} else if shouldEnableReload && !exists {
-				logger.Subprocess("HTTPD will not be reloadable since .httpd.conf.d folder not found")
+				logger.Debug.Subprocess("HTTPD configuration will not be reloadable since .httpd.conf.d folder not found")
 			}
 
 			procs.Add("httpd", serverProc)
@@ -100,7 +100,7 @@ func Build(procs ProcMgr, logger scribe.Emitter, reloader Reloader) packit.Build
 					"-c", nginxConfPath,
 				})
 			} else if shouldEnableReload && !exists {
-				logger.Subprocess("NGINX will not be reloadable since .nginx.conf.d folder not found")
+				logger.Debug.Subprocess("NGINX configuration will not be reloadable since .nginx.conf.d folder not found")
 			}
 
 			procs.Add("nginx", serverProc)

@@ -43,7 +43,7 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 		Expect(os.WriteFile(filepath.Join(cnbDir, "bin", "procmgr-binary"), []byte{}, 0644)).To(Succeed())
 
 		buffer = bytes.NewBuffer(nil)
-		logEmitter := scribe.NewEmitter(buffer)
+		logEmitter := scribe.NewEmitter(buffer).WithLevel("DEBUG")
 
 		procMgr = &fakes.ProcMgr{}
 		reloader = &fakes.Reloader{}
@@ -201,7 +201,7 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 						},
 					}
 					Expect(processes).To(Equal(expectedProcesses))
-					Expect(buffer.String()).To(ContainSubstring("HTTPD will not be reloadable since .httpd.conf.d folder not found"))
+					Expect(buffer.String()).To(ContainSubstring("HTTPD configuration will not be reloadable since .httpd.conf.d folder not found"))
 					Expect(buffer.String()).To(ContainSubstring("FPM will not be reloadable since .php.fpm.d folder not found"))
 				})
 			})
@@ -350,7 +350,7 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 						},
 					}
 					Expect(processes).To(Equal(expectedProcesses))
-					Expect(buffer.String()).To(ContainSubstring("NGINX will not be reloadable since .nginx.conf.d folder not found"))
+					Expect(buffer.String()).To(ContainSubstring("NGINX configuration will not be reloadable since .nginx.conf.d folder not found"))
 					Expect(buffer.String()).To(ContainSubstring("FPM will not be reloadable since .php.fpm.d folder not found"))
 				})
 			})
