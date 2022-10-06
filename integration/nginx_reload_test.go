@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/paketo-buildpacks/occam"
-	"github.com/paketo-buildpacks/php-start/integration"
 	"github.com/sclevine/spec"
 
 	. "github.com/onsi/gomega"
@@ -162,14 +161,14 @@ func testNginxReload(t *testing.T, context spec.G, it spec.S) {
 				Execute(image.ID)
 			Expect(err).NotTo(HaveOccurred())
 
-			Eventually(container).Should(integration.ServeHeader("X-Paketo-Testing", "original-nginx-value").
+			Eventually(container).Should(Serve(WithHeader("X-Paketo-Testing", "original-nginx-value")).
 				OnPort(8080).
 				WithEndpoint("/index.php?date"))
 
 			err = docker.Container.Exec.ExecuteBash(container.ID, "sed -i 's/original-nginx-value/reloaded-nginx-value/g' /workspace/.nginx.conf.d/header-server.conf")
 			Expect(err).NotTo(HaveOccurred())
 
-			Eventually(container).Should(integration.ServeHeader("X-Paketo-Testing", "reloaded-nginx-value").
+			Eventually(container).Should(Serve(WithHeader("X-Paketo-Testing", "reloaded-nginx-value")).
 				OnPort(8080).
 				WithEndpoint("/index.php?date"))
 		})

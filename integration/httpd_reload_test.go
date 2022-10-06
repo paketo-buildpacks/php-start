@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/paketo-buildpacks/occam"
-	"github.com/paketo-buildpacks/php-start/integration"
 	"github.com/sclevine/spec"
 
 	. "github.com/onsi/gomega"
@@ -160,14 +159,14 @@ func testHttpdReload(t *testing.T, context spec.G, it spec.S) {
 				Execute(image.ID)
 			Expect(err).NotTo(HaveOccurred())
 
-			Eventually(container).Should(integration.ServeHeader("X-Paketo-Testing", "original-httpd-value").
+			Eventually(container).Should(Serve(WithHeader("X-Paketo-Testing", "original-httpd-value")).
 				OnPort(8080).
 				WithEndpoint("/index.php?date"))
 
 			err = docker.Container.Exec.ExecuteBash(container.ID, "sed -i 's/original-httpd-value/reloaded-httpd-value/g' /workspace/.httpd.conf.d/header-server.conf")
 			Expect(err).NotTo(HaveOccurred())
 
-			Eventually(container).Should(integration.ServeHeader("X-Paketo-Testing", "reloaded-httpd-value").
+			Eventually(container).Should(Serve(WithHeader("X-Paketo-Testing", "reloaded-httpd-value")).
 				OnPort(8080).
 				WithEndpoint("/index.php?date"))
 		})
