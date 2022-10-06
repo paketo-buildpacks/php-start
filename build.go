@@ -159,21 +159,13 @@ func Build(procs ProcMgr, logger scribe.Emitter, reloader Reloader) packit.Build
 			return packit.BuildResult{}, fmt.Errorf("failed to copy procmgr-binary into layer: %w", err)
 		}
 
-		originalProcess := packit.Process{
+		processes := []packit.Process{{
 			Type:    "web",
 			Command: "procmgr-binary",
 			Args:    []string{filepath.Join(layer.Path, "procs.yml")},
 			Default: true,
 			Direct:  true,
-		}
-
-		processes := make([]packit.Process, 0)
-
-		if _, err := reloader.ShouldEnableLiveReload(); err != nil {
-			return packit.BuildResult{}, err
-		} else {
-			processes = append(processes, originalProcess)
-		}
+		}}
 
 		logger.LaunchProcesses(processes)
 
