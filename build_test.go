@@ -141,7 +141,7 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 							Args: []string{
 								"--watch", "/workspace/.php.fpm.d",
 								"--on-busy-update", "signal",
-								"--signal", "SIGHUP",
+								"--signal", "SIGUSR2",
 								"--shell", "none",
 								"--", "php-fpm",
 								"-y", "fpm-conf-path",
@@ -295,7 +295,7 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 							Args: []string{
 								"--watch", "/workspace/.php.fpm.d",
 								"--on-busy-update", "signal",
-								"--signal", "SIGHUP",
+								"--signal", "SIGUSR2",
 								"--shell", "none",
 								"--", "php-fpm",
 								"-y", "fpm-conf-path",

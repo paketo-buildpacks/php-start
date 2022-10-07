@@ -67,6 +67,8 @@ func Build(procs ProcMgr, logger scribe.Emitter, reloader Reloader) packit.Build
 			if exists, err := fs.Exists(filepath.Join(context.WorkingDir, ".httpd.conf.d")); err != nil {
 				return packit.BuildResult{}, err
 			} else if shouldEnableReload && exists {
+				// HTTPD should reload configuration when it receives SIGHUP
+				// https://httpd.apache.org/docs/2.4/stopping.html
 				serverProc = NewProc("watchexec", []string{
 					"--watch", "/workspace/.httpd.conf.d",
 					"--on-busy-update", "signal",
@@ -92,6 +94,8 @@ func Build(procs ProcMgr, logger scribe.Emitter, reloader Reloader) packit.Build
 			if exists, err := fs.Exists(filepath.Join(context.WorkingDir, ".nginx.conf.d")); err != nil {
 				return packit.BuildResult{}, err
 			} else if shouldEnableReload && exists {
+				// NGINX should reload configuration when it receives SIGHUP
+				// http://nginx.org/en/docs/control.html
 				serverProc = NewProc("watchexec", []string{
 					"--watch", "/workspace/.nginx.conf.d",
 					"--on-busy-update", "signal",
@@ -124,10 +128,12 @@ func Build(procs ProcMgr, logger scribe.Emitter, reloader Reloader) packit.Build
 		if exists, err := fs.Exists(filepath.Join(context.WorkingDir, ".php.fpm.d")); err != nil {
 			return packit.BuildResult{}, err
 		} else if shouldEnableReload && exists {
+			// FPM should reload configuration when it receives SIGUSR2
+			// https://linux.die.net/man/8/php-fpm
 			fpmProc = NewProc("watchexec", []string{
 				"--watch", "/workspace/.php.fpm.d",
 				"--on-busy-update", "signal",
-				"--signal", "SIGHUP",
+				"--signal", "SIGUSR2",
 				"--shell", "none",
 				"--", "php-fpm",
 				"-y", fpmConfPath,

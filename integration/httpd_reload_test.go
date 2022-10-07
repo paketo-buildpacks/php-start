@@ -144,7 +144,7 @@ func testHttpdReload(t *testing.T, context spec.G, it spec.S) {
 			Expect(logs).To(ContainLines(
 				"  Determining start commands to include in procs.yml:",
 				MatchRegexp(`    HTTPD: watchexec --watch /workspace/\.httpd\.conf\.d --on-busy-update signal --signal SIGHUP --shell none -- httpd -f /layers/.*/php-httpd-config/httpd\.conf -k start -DFOREGROUND`),
-				MatchRegexp(`    FPM: watchexec --watch /workspace/\.php\.fpm\.d --on-busy-update signal --signal SIGHUP --shell none -- php-fpm -y /layers/.*/php-fpm-config/base.conf -c /layers/.*/php/etc`),
+				MatchRegexp(`    FPM: watchexec --watch /workspace/\.php\.fpm\.d --on-busy-update signal --signal SIGUSR2 --shell none -- php-fpm -y /layers/.*/php-fpm-config/base.conf -c /layers/.*/php/etc`),
 			))
 
 			Expect(logs).To(ContainLines(
