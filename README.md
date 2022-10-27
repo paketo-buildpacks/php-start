@@ -33,7 +33,7 @@ buildpacks in the PHP language family.
 | `httpd-config` or `nginx-config` | x     | x      |
 
 It will set the default start command to something that looks like:
-```
+```shell
 procmgr-binary /layers/paketo-buildpacks_php-start/php-start/procs.yml
 ```
 
@@ -45,6 +45,21 @@ commands and arguments for both `php-fpm` and the web-server.
 When the buildpack runs, you will see in the logs what processes are added to
 procs.yml.
 
+### Live Reload
+
+Both `httpd` and `nginx` automatically reload changed files, so applications built by this buildpack
+implicitly support live reloading of served files.
+
+This buildpack adds explicit live reload support for `httpd` and `nginx` configuration files
+at the following locations:
+
+- `http`: `<app-directory>/.httpd.conf.d/`
+- `nginx`: `<app-directory>/.nginx.conf.d/`
+
+See the following integration test files for examples of both application code live reload and configuration live reload.
+
+- integration/httpd_reload_test.go
+- integration/nginx_reload_test.go
 
 ## Integration
 

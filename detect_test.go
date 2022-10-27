@@ -1,6 +1,7 @@
 package phpstart_test
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -9,12 +10,15 @@ import (
 	. "github.com/onsi/gomega/gstruct"
 	"github.com/paketo-buildpacks/packit/v2"
 	phpstart "github.com/paketo-buildpacks/php-start"
+	"github.com/paketo-buildpacks/php-start/fakes"
 	"github.com/sclevine/spec"
 )
 
 func testDetect(t *testing.T, context spec.G, it spec.S) {
 	var (
 		Expect = NewWithT(t).Expect
+
+		reloader *fakes.Reloader
 
 		workingDir string
 		detect     packit.DetectFunc
@@ -23,7 +27,9 @@ func testDetect(t *testing.T, context spec.G, it spec.S) {
 	it.Before(func() {
 		workingDir = t.TempDir()
 
-		detect = phpstart.Detect()
+		reloader = &fakes.Reloader{}
+
+		detect = phpstart.Detect(reloader)
 	})
 
 	context("Detect", func() {
@@ -173,4 +179,48 @@ func testDetect(t *testing.T, context spec.G, it spec.S) {
 			})
 		}, spec.Sequential())
 	})
+
+	context("live reload", func() {
+		context("when live reload is enabled", func() {
+			it.Before(func() {
+				reloader.ShouldEnableLiveReloadCall.Returns.Bool = true
+			})
+
+			it("will require watchexec", func() {
+				result, err := detect(packit.DetectContext{
+					WorkingDir: workingDir,
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(result.Plan.Requires).To(ContainElements(packit.BuildPlanRequirement{
+					Name: "watchexec",
+					Metadata: phpstart.BuildPlanMetadata{
+						Launch: true,
+					},
+				}))
+
+				Expect(result.Plan.Or[0].Requires).To(ContainElements(packit.BuildPlanRequirement{
+					Name: "watchexec",
+					Metadata: phpstart.BuildPlanMetadata{
+						Launch: true,
+					},
+				}))
+			})
+
+			context("failure cases", func() {
+				context("when reloader returns an error", func() {
+					it.Before(func() {
+						reloader.ShouldEnableLiveReloadCall.Returns.Error = errors.New("reload error")
+					})
+
+					it("will return the error", func() {
+						_, err := detect(packit.DetectContext{
+							WorkingDir: workingDir,
+						})
+						Expect(err).To(MatchError("reload error"))
+					})
+				})
+			})
+		})
+	}, spec.Sequential())
 }

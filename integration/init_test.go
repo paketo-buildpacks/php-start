@@ -17,14 +17,15 @@ import (
 )
 
 var (
-	buildpack         string
-	phpDistBuildpack  string
-	phpFpmBuildpack   string
-	httpdBuildpack    string
-	phpHttpdBuildpack string
-	nginxBuildpack    string
-	phpNginxBuildpack string
-	root              string
+	buildpack          string
+	phpDistBuildpack   string
+	phpFpmBuildpack    string
+	httpdBuildpack     string
+	phpHttpdBuildpack  string
+	nginxBuildpack     string
+	phpNginxBuildpack  string
+	watchexecBuildpack string
+	root               string
 
 	buildpackInfo struct {
 		Buildpack struct {
@@ -40,12 +41,13 @@ func TestIntegration(t *testing.T) {
 	format.MaxLength = 0
 
 	var config struct {
-		PhpDist  string `json:"php-dist"`
-		PhpFpm   string `json:"php-fpm"`
-		Httpd    string `json:"httpd"`
-		PhpHttpd string `json:"php-httpd"`
-		Nginx    string `json:"nginx"`
-		PhpNginx string `json:"php-nginx"`
+		PhpDist   string `json:"php-dist"`
+		PhpFpm    string `json:"php-fpm"`
+		Httpd     string `json:"httpd"`
+		PhpHttpd  string `json:"php-httpd"`
+		Nginx     string `json:"nginx"`
+		PhpNginx  string `json:"php-nginx"`
+		Watchexec string `json:"watchexec"`
 	}
 
 	file, err := os.Open("../integration.json")
@@ -94,10 +96,16 @@ func TestIntegration(t *testing.T) {
 		Execute(config.PhpNginx)
 	Expect(err).NotTo(HaveOccurred())
 
+	watchexecBuildpack, err = buildpackStore.Get.
+		Execute(config.Watchexec)
+	Expect(err).NotTo(HaveOccurred())
+
 	SetDefaultEventuallyTimeout(10 * time.Second)
 
 	suite := spec.New("Integration", spec.Report(report.Terminal{}), spec.Parallel())
 	suite("Httpd", testHttpd)
+	suite("HttpdReload", testHttpdReload)
 	suite("Nginx", testNginx)
+	suite("NginxReload", testNginxReload)
 	suite.Run(t)
 }
