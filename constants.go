@@ -7,4 +7,5 @@ const (
 	Httpd          = "httpd"
 	Php            = "php"
 	PhpFpm         = "php-fpm"
+	Watchexec      = "watchexec"
 )

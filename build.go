@@ -28,7 +28,7 @@ type ProcMgr interface {
 // of processes to run, since there are multiple process that could be run. The
 // layer is available at and launch-time, and its contents are used in the
 // image launch process.
-func Build(procs ProcMgr, logger scribe.Emitter) packit.BuildFunc {
+func Build(procs ProcMgr, logger scribe.Emitter, reloader Reloader) packit.BuildFunc {
 	return func(context packit.BuildContext) (packit.BuildResult, error) {
 		logger.Title("%s %s", context.BuildpackInfo.Name, context.BuildpackInfo.Version)
 
@@ -54,10 +54,35 @@ func Build(procs ProcMgr, logger scribe.Emitter) packit.BuildFunc {
 			return packit.BuildResult{}, errors.New("need exactly one of: $PHP_HTTPD_PATH or $PHP_NGINX_PATH")
 		}
 
+		shouldEnableReload, err := reloader.ShouldEnableLiveReload()
+		if err != nil {
+			return packit.BuildResult{}, err
+		}
+
 		logger.Process("Determining start commands to include in procs.yml:")
 		// HTTPD Case
 		if httpdConfPath != "" {
 			serverProc := NewProc("httpd", []string{"-f", httpdConfPath, "-k", "start", "-DFOREGROUND"})
+
+			if exists, err := fs.Exists(filepath.Join(context.WorkingDir, ".httpd.conf.d")); err != nil {
+				return packit.BuildResult{}, err
+			} else if shouldEnableReload && exists {
+				// HTTPD should reload configuration when it receives SIGHUP
+				// https://httpd.apache.org/docs/2.4/stopping.html
+				serverProc = NewProc("watchexec", []string{
+					"--watch", "/workspace/.httpd.conf.d",
+					"--on-busy-update", "signal",
+					"--signal", "SIGHUP",
+					"--shell", "none",
+					"--", "httpd",
+					"-f", httpdConfPath, "-k",
+					"start",
+					"-DFOREGROUND",
+				})
+			} else if shouldEnableReload && !exists {
+				logger.Debug.Subprocess("HTTPD configuration will not be reloadable since .httpd.conf.d folder not found")
+			}
+
 			procs.Add("httpd", serverProc)
 			logger.Subprocess("HTTPD: %s %v", serverProc.Command, strings.Join(serverProc.Args, " "))
 		}
@@ -65,6 +90,25 @@ func Build(procs ProcMgr, logger scribe.Emitter) packit.BuildFunc {
 		// Nginx Case
 		if nginxConfPath != "" {
 			serverProc := NewProc("nginx", []string{"-p", context.WorkingDir, "-c", nginxConfPath})
+
+			if exists, err := fs.Exists(filepath.Join(context.WorkingDir, ".nginx.conf.d")); err != nil {
+				return packit.BuildResult{}, err
+			} else if shouldEnableReload && exists {
+				// NGINX should reload configuration when it receives SIGHUP
+				// http://nginx.org/en/docs/control.html
+				serverProc = NewProc("watchexec", []string{
+					"--watch", "/workspace/.nginx.conf.d",
+					"--on-busy-update", "signal",
+					"--signal", "SIGHUP",
+					"--shell", "none",
+					"--", "nginx",
+					"-p", context.WorkingDir,
+					"-c", nginxConfPath,
+				})
+			} else if shouldEnableReload && !exists {
+				logger.Debug.Subprocess("NGINX configuration will not be reloadable since .nginx.conf.d folder not found")
+			}
+
 			procs.Add("nginx", serverProc)
 			logger.Subprocess("Nginx: %s %v", serverProc.Command, strings.Join(serverProc.Args, " "))
 		}
@@ -80,6 +124,25 @@ func Build(procs ProcMgr, logger scribe.Emitter) packit.BuildFunc {
 			return packit.BuildResult{}, errors.New("failed to lookup $PHPRC path for FPM")
 		}
 		fpmProc := NewProc("php-fpm", []string{"-y", fpmConfPath, "-c", phprcPath})
+
+		if exists, err := fs.Exists(filepath.Join(context.WorkingDir, ".php.fpm.d")); err != nil {
+			return packit.BuildResult{}, err
+		} else if shouldEnableReload && exists {
+			// FPM should reload configuration when it receives SIGUSR2
+			// https://linux.die.net/man/8/php-fpm
+			fpmProc = NewProc("watchexec", []string{
+				"--watch", "/workspace/.php.fpm.d",
+				"--on-busy-update", "signal",
+				"--signal", "SIGUSR2",
+				"--shell", "none",
+				"--", "php-fpm",
+				"-y", fpmConfPath,
+				"-c", phprcPath,
+			})
+		} else if shouldEnableReload && !exists {
+			logger.Subprocess("FPM will not be reloadable since .php.fpm.d folder not found")
+		}
+
 		procs.Add("fpm", fpmProc)
 		logger.Subprocess("FPM: %s %v", fpmProc.Command, strings.Join(fpmProc.Args, " "))
 
@@ -105,15 +168,14 @@ func Build(procs ProcMgr, logger scribe.Emitter) packit.BuildFunc {
 			return packit.BuildResult{}, fmt.Errorf("failed to copy procmgr-binary into layer: %w", err)
 		}
 
-		processes := []packit.Process{
-			{
-				Type:    "web",
-				Command: "procmgr-binary",
-				Args:    []string{filepath.Join(layer.Path, "procs.yml")},
-				Default: true,
-				Direct:  true,
-			},
-		}
+		processes := []packit.Process{{
+			Type:    "web",
+			Command: "procmgr-binary",
+			Args:    []string{filepath.Join(layer.Path, "procs.yml")},
+			Default: true,
+			Direct:  true,
+		}}
+
 		logger.LaunchProcesses(processes)
 
 		return packit.BuildResult{

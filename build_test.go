@@ -27,6 +27,7 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 
 		buffer    *bytes.Buffer
 		procMgr   *fakes.ProcMgr
+		reloader  *fakes.Reloader
 		processes map[string]phpstart.Proc
 
 		buildContext packit.BuildContext
@@ -42,9 +43,10 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 		Expect(os.WriteFile(filepath.Join(cnbDir, "bin", "procmgr-binary"), []byte{}, 0644)).To(Succeed())
 
 		buffer = bytes.NewBuffer(nil)
-		logEmitter := scribe.NewEmitter(buffer)
+		logEmitter := scribe.NewEmitter(buffer).WithLevel("DEBUG")
 
 		procMgr = &fakes.ProcMgr{}
+		reloader = &fakes.Reloader{}
 		processes = map[string]phpstart.Proc{}
 		procMgr.AddCall.Stub = func(procName string, newProc phpstart.Proc) {
 			processes[procName] = newProc
@@ -63,10 +65,10 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 			},
 			Layers: packit.Layers{Path: layersDir},
 		}
-		build = phpstart.Build(procMgr, logEmitter)
+		build = phpstart.Build(procMgr, logEmitter, reloader)
 	})
 
-	context("the PHP_HTTPD, PHP_FPM_PATH, and PHPRC env vars are set", func() {
+	context("[HTTPD] the PHP_HTTPD, PHP_FPM_PATH, and PHPRC env vars are set", func() {
 		it.Before(func() {
 			t.Setenv("PHP_HTTPD_PATH", "httpd-conf-path")
 			t.Setenv("PHP_FPM_PATH", "fpm-conf-path")
@@ -117,9 +119,111 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 			Expect(buffer.String()).To(ContainSubstring("FPM: php-fpm -y fpm-conf-path -c phprc-path"))
 			Expect(buffer.String()).To(ContainSubstring("HTTPD: httpd -f httpd-conf-path -k start -DFOREGROUND"))
 		})
+
+		context("when live reload is enabled", func() {
+			it.Before(func() {
+				reloader.ShouldEnableLiveReloadCall.Returns.Bool = true
+			})
+
+			context("the watch directories exist", func() {
+				it.Before(func() {
+					Expect(os.MkdirAll(filepath.Join(workingDir, ".php.fpm.d"), os.ModePerm)).To(Succeed())
+					Expect(os.MkdirAll(filepath.Join(workingDir, ".httpd.conf.d"), os.ModePerm)).To(Succeed())
+				})
+
+				it("should add watchexec processes to the process file", func() {
+					result, err := build(buildContext)
+					Expect(err).NotTo(HaveOccurred())
+
+					expectedProcesses := map[string]phpstart.Proc{
+						"fpm": {
+							Command: "watchexec",
+							Args: []string{
+								"--watch", "/workspace/.php.fpm.d",
+								"--on-busy-update", "signal",
+								"--signal", "SIGUSR2",
+								"--shell", "none",
+								"--", "php-fpm",
+								"-y", "fpm-conf-path",
+								"-c", "phprc-path",
+							},
+						},
+						"httpd": {
+							Command: "watchexec",
+							Args: []string{
+								"--watch", "/workspace/.httpd.conf.d",
+								"--on-busy-update", "signal",
+								"--signal", "SIGHUP",
+								"--shell", "none",
+								"--", "httpd",
+								"-f", "httpd-conf-path",
+								"-k", "start",
+								"-DFOREGROUND",
+							},
+						},
+					}
+					Expect(processes).To(Equal(expectedProcesses))
+
+					Expect(result.Launch.Processes).To(ConsistOf(packit.Process{
+						Type:    "web",
+						Command: "procmgr-binary",
+						Args:    []string{filepath.Join(layersDir, "php-start", "procs.yml")},
+						Default: true,
+						Direct:  true,
+					}))
+
+					Expect(reloader.TransformReloadableProcessesCall.CallCount).To(Equal(0))
+				})
+			})
+
+			context("the watch directories do not exist", func() {
+				it("should add non-reloadable processes to the process file", func() {
+					_, err := build(buildContext)
+					Expect(err).NotTo(HaveOccurred())
+
+					expectedProcesses := map[string]phpstart.Proc{
+						"fpm": {
+							Command: "php-fpm",
+							Args: []string{
+								"-y",
+								"fpm-conf-path",
+								"-c",
+								"phprc-path",
+							},
+						},
+						"httpd": {
+							Command: "httpd",
+							Args: []string{
+								"-f",
+								"httpd-conf-path",
+								"-k",
+								"start",
+								"-DFOREGROUND",
+							},
+						},
+					}
+					Expect(processes).To(Equal(expectedProcesses))
+					Expect(buffer.String()).To(ContainSubstring("HTTPD configuration will not be reloadable since .httpd.conf.d folder not found"))
+					Expect(buffer.String()).To(ContainSubstring("FPM will not be reloadable since .php.fpm.d folder not found"))
+				})
+			})
+
+			context("failure cases", func() {
+				context("when reloader returns an error", func() {
+					it.Before(func() {
+						reloader.ShouldEnableLiveReloadCall.Returns.Error = errors.New("reload error")
+					})
+
+					it("will return the error", func() {
+						_, err := build(buildContext)
+						Expect(err).To(MatchError("reload error"))
+					})
+				})
+			})
+		})
 	})
 
-	context("the PHP_NGINX, PHP_FPM_PATH, and PHPRC env vars are set", func() {
+	context("[NGINX] the PHP_NGINX, PHP_FPM_PATH, and PHPRC env vars are set", func() {
 		it.Before(func() {
 			t.Setenv("PHP_NGINX_PATH", "nginx-conf-path")
 			t.Setenv("PHP_FPM_PATH", "fpm-conf-path")
@@ -168,6 +272,105 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 			Expect(buffer.String()).To(ContainSubstring("Determining start commands to include in procs.yml:"))
 			Expect(buffer.String()).To(ContainSubstring("FPM: php-fpm -y fpm-conf-path -c phprc-path"))
 			Expect(buffer.String()).To(ContainSubstring(fmt.Sprintf("Nginx: nginx -p %s -c nginx-conf-path", workingDir)))
+		})
+
+		context("when live reload is enabled", func() {
+			it.Before(func() {
+				reloader.ShouldEnableLiveReloadCall.Returns.Bool = true
+			})
+
+			context("the watch directories exist", func() {
+				it.Before(func() {
+					Expect(os.MkdirAll(filepath.Join(workingDir, ".php.fpm.d"), os.ModePerm)).To(Succeed())
+					Expect(os.MkdirAll(filepath.Join(workingDir, ".nginx.conf.d"), os.ModePerm)).To(Succeed())
+				})
+
+				it("should add watchexec processes to the process file", func() {
+					result, err := build(buildContext)
+					Expect(err).NotTo(HaveOccurred())
+
+					expectedProcesses := map[string]phpstart.Proc{
+						"fpm": {
+							Command: "watchexec",
+							Args: []string{
+								"--watch", "/workspace/.php.fpm.d",
+								"--on-busy-update", "signal",
+								"--signal", "SIGUSR2",
+								"--shell", "none",
+								"--", "php-fpm",
+								"-y", "fpm-conf-path",
+								"-c", "phprc-path",
+							},
+						},
+						"nginx": {
+							Command: "watchexec",
+							Args: []string{
+								"--watch", "/workspace/.nginx.conf.d",
+								"--on-busy-update", "signal",
+								"--signal", "SIGHUP",
+								"--shell", "none",
+								"--", "nginx",
+								"-p", workingDir,
+								"-c", "nginx-conf-path"},
+						},
+					}
+					Expect(processes).To(Equal(expectedProcesses))
+
+					Expect(result.Launch.Processes).To(ConsistOf(packit.Process{
+						Type:    "web",
+						Command: "procmgr-binary",
+						Args:    []string{filepath.Join(layersDir, "php-start", "procs.yml")},
+						Default: true,
+						Direct:  true,
+					}))
+
+					Expect(reloader.TransformReloadableProcessesCall.CallCount).To(Equal(0))
+				})
+			})
+
+			context("the watch directories do not exist", func() {
+				it("should add non-reloadable processes to the process file", func() {
+					_, err := build(buildContext)
+					Expect(err).NotTo(HaveOccurred())
+
+					expectedProcesses := map[string]phpstart.Proc{
+						"fpm": {
+							Command: "php-fpm",
+							Args: []string{
+								"-y",
+								"fpm-conf-path",
+								"-c",
+								"phprc-path",
+							},
+						},
+						"nginx": {
+							Command: "nginx",
+							Args: []string{
+								"-p",
+								workingDir,
+								"-c",
+								"nginx-conf-path",
+							},
+						},
+					}
+					Expect(processes).To(Equal(expectedProcesses))
+					Expect(buffer.String()).To(ContainSubstring("NGINX configuration will not be reloadable since .nginx.conf.d folder not found"))
+					Expect(buffer.String()).To(ContainSubstring("FPM will not be reloadable since .php.fpm.d folder not found"))
+				})
+			})
+
+			context("failure cases", func() {
+				context("when reloader returns an error", func() {
+					it.Before(func() {
+						reloader.ShouldEnableLiveReloadCall.Returns.Error = errors.New("reload error")
+					})
+
+					it("will return the error", func() {
+						_, err := build(buildContext)
+						Expect(err).To(MatchError("reload error"))
+					})
+				})
+			})
 		})
 	})
 

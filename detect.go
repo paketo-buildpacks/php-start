@@ -4,9 +4,14 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/paketo-buildpacks/libreload-packit"
 	"github.com/paketo-buildpacks/packit/v2"
 	"github.com/paketo-buildpacks/packit/v2/fs"
 )
+
+type Reloader libreload.Reloader
+
+//go:generate faux --interface Reloader --output fakes/reloader.go
 
 // BuildPlanMetadata is the buildpack specific data included in build plan
 // requirements.
@@ -39,7 +44,7 @@ type BuildPlanMetadata struct {
 // Additionally, this buildpack will require 'composer-packages' when a composer.json is found.
 //
 // This buildpack will always detect.
-func Detect() packit.DetectFunc {
+func Detect(reloader Reloader) packit.DetectFunc {
 	return func(context packit.DetectContext) (packit.DetectResult, error) {
 		baseRequirements := []packit.BuildPlanRequirement{
 			{
@@ -55,6 +60,17 @@ func Detect() packit.DetectFunc {
 					Launch: true,
 				},
 			},
+		}
+
+		if shouldReload, err := reloader.ShouldEnableLiveReload(); err != nil {
+			return packit.DetectResult{}, err
+		} else if shouldReload {
+			baseRequirements = append(baseRequirements, packit.BuildPlanRequirement{
+				Name: Watchexec,
+				Metadata: BuildPlanMetadata{
+					Launch: true,
+				},
+			})
 		}
 
 		composerJsonPath := filepath.Join(context.WorkingDir, "composer.json")
