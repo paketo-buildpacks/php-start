@@ -3,7 +3,7 @@ module github.com/paketo-buildpacks/php-start
 go 1.18
 
 require (
-	github.com/BurntSushi/toml v1.3.1
+	github.com/BurntSushi/toml v1.3.2
 	github.com/onsi/gomega v1.27.8
 	github.com/paketo-buildpacks/libreload-packit v0.0.1
 	github.com/paketo-buildpacks/occam v0.16.0
