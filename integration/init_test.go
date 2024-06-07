@@ -66,6 +66,7 @@ func TestIntegration(t *testing.T) {
 	Expect(err).ToNot(HaveOccurred())
 
 	buildpackStore := occam.NewBuildpackStore()
+	docker := occam.NewDocker()
 
 	buildpack, err = buildpackStore.Get.
 		WithVersion("1.2.3").
@@ -96,9 +97,9 @@ func TestIntegration(t *testing.T) {
 		Execute(config.PhpNginx)
 	Expect(err).NotTo(HaveOccurred())
 
-	watchexecBuildpack, err = buildpackStore.Get.
-		Execute(config.Watchexec)
-	Expect(err).NotTo(HaveOccurred())
+	watchexecBuildpack = config.Watchexec
+	err = docker.Pull.Execute(config.Watchexec)
+	Expect(err).ToNot(HaveOccurred())
 
 	SetDefaultEventuallyTimeout(10 * time.Second)
 
