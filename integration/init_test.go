@@ -10,6 +10,7 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/onsi/gomega/format"
 	"github.com/paketo-buildpacks/occam"
+	"github.com/paketo-buildpacks/occam/packagers"
 	"github.com/sclevine/spec"
 	"github.com/sclevine/spec/report"
 
@@ -66,6 +67,7 @@ func TestIntegration(t *testing.T) {
 	Expect(err).ToNot(HaveOccurred())
 
 	buildpackStore := occam.NewBuildpackStore()
+	libpakBuildpackStore := occam.NewBuildpackStore().WithPackager(packagers.NewLibpak())
 
 	buildpack, err = buildpackStore.Get.
 		WithVersion("1.2.3").
@@ -96,7 +98,7 @@ func TestIntegration(t *testing.T) {
 		Execute(config.PhpNginx)
 	Expect(err).NotTo(HaveOccurred())
 
-	watchexecBuildpack, err = buildpackStore.Get.
+	watchexecBuildpack, err = libpakBuildpackStore.Get.
 		Execute(config.Watchexec)
 	Expect(err).NotTo(HaveOccurred())
 
