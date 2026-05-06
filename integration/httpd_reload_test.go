@@ -163,7 +163,7 @@ func testHttpdReload(t *testing.T, context spec.G, it spec.S) {
 				OnPort(8080).
 				WithEndpoint("/index.php?date"))
 
-			err = docker.Container.Exec.ExecuteBash(container.ID, "sed -i 's/original-httpd-value/reloaded-httpd-value/g' /workspace/.httpd.conf.d/header-server.conf")
+			err = docker.Container.Exec.ExecuteBash(container.ID, "sed 's/original-httpd-value/reloaded-httpd-value/g' /workspace/.httpd.conf.d/header-server.conf > /tmp/sed_tmp && cat /tmp/sed_tmp > /workspace/.httpd.conf.d/header-server.conf")
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(container).Should(Serve(WithHeader("X-Paketo-Testing", "reloaded-httpd-value")).
@@ -215,7 +215,7 @@ func testHttpdReload(t *testing.T, context spec.G, it spec.S) {
 
 			Eventually(container).Should(Serve(ContainSubstring("SUCCESS: date loads.")).OnPort(8080).WithEndpoint("/index.php?date"))
 
-			err = docker.Container.Exec.ExecuteBash(container.ID, "sed -i 's/pm.max_children = 5/pm.max_children = 6/g' /workspace/.php.fpm.d/user.conf")
+			err = docker.Container.Exec.ExecuteBash(container.ID, "sed 's/pm.max_children = 5/pm.max_children = 6/g' /workspace/.php.fpm.d/user.conf > /tmp/sed_tmp && cat /tmp/sed_tmp > /workspace/.php.fpm.d/user.conf")
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() string {

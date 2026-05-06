@@ -163,7 +163,7 @@ func testNginxReload(t *testing.T, context spec.G, it spec.S) {
 				OnPort(8080).
 				WithEndpoint("/index.php?date"))
 
-			err = docker.Container.Exec.ExecuteBash(container.ID, "sed -i 's/original-nginx-value/reloaded-nginx-value/g' /workspace/.nginx.conf.d/header-server.conf")
+			err = docker.Container.Exec.ExecuteBash(container.ID, "sed 's/original-nginx-value/reloaded-nginx-value/g' /workspace/.nginx.conf.d/header-server.conf > /tmp/sed_tmp && cat /tmp/sed_tmp > /workspace/.nginx.conf.d/header-server.conf")
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(container).Should(Serve(WithHeader("X-Paketo-Testing", "reloaded-nginx-value")).
