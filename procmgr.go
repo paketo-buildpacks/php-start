@@ -57,7 +57,11 @@ func ReadProcs(path string) (Procs, error) {
 	} else if err != nil {
 		return Procs{}, fmt.Errorf("failed to open proc.yml: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			fmt.Fprintf(os.Stderr, "failed to close file: %v\n", err)
+		}
+	}()
 
 	contents, err := io.ReadAll(file)
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -51,54 +52,61 @@ func TestIntegration(t *testing.T) {
 		Watchexec string `json:"watchexec"`
 	}
 
-	file, err := os.Open("../integration.json")
+	integrationFile, err := os.Open("../integration.json")
 	Expect(err).NotTo(HaveOccurred())
-	defer file.Close()
+	defer func() {
+		if err := integrationFile.Close(); err != nil {
+			Expect(err).NotTo(HaveOccurred())
+		}
+	}()
 
-	Expect(json.NewDecoder(file).Decode(&config)).To(Succeed())
+	Expect(json.NewDecoder(integrationFile).Decode(&config)).To(Succeed())
 
-	file, err = os.Open("../buildpack.toml")
+	buildpackFile, err := os.Open("../buildpack.toml")
 	Expect(err).NotTo(HaveOccurred())
 
-	_, err = toml.NewDecoder(file).Decode(&buildpackInfo)
+	_, err = toml.NewDecoder(buildpackFile).Decode(&buildpackInfo)
 	Expect(err).NotTo(HaveOccurred())
+	Expect(buildpackFile.Close()).To(Succeed())
 
 	root, err = filepath.Abs("./..")
 	Expect(err).ToNot(HaveOccurred())
 
 	buildpackStore := occam.NewBuildpackStore()
 	libpakBuildpackStore := occam.NewBuildpackStore().WithPackager(packagers.NewLibpak())
+	targetedBuildpackStore := buildpackStore.WithTarget("linux/" + runtime.GOARCH)
+	targetedLibpakBuildpackStore := libpakBuildpackStore.WithTarget("linux/" + runtime.GOARCH)
 
 	buildpack, err = buildpackStore.Get.
 		WithVersion("1.2.3").
 		Execute(root)
 	Expect(err).NotTo(HaveOccurred())
 
-	phpDistBuildpack, err = buildpackStore.Get.
+	phpDistBuildpack, err = targetedBuildpackStore.Get.
 		Execute(config.PhpDist)
 	Expect(err).NotTo(HaveOccurred())
 
-	phpFpmBuildpack, err = buildpackStore.Get.
+	phpFpmBuildpack, err = targetedBuildpackStore.Get.
 		Execute(config.PhpFpm)
 	Expect(err).NotTo(HaveOccurred())
 
-	httpdBuildpack, err = buildpackStore.Get.
+	httpdBuildpack, err = targetedBuildpackStore.Get.
 		Execute(config.Httpd)
 	Expect(err).NotTo(HaveOccurred())
 
-	phpHttpdBuildpack, err = buildpackStore.Get.
+	phpHttpdBuildpack, err = targetedBuildpackStore.Get.
 		Execute(config.PhpHttpd)
 	Expect(err).NotTo(HaveOccurred())
 
-	nginxBuildpack, err = buildpackStore.Get.
+	nginxBuildpack, err = targetedBuildpackStore.Get.
 		Execute(config.Nginx)
 	Expect(err).NotTo(HaveOccurred())
 
-	phpNginxBuildpack, err = buildpackStore.Get.
+	phpNginxBuildpack, err = targetedBuildpackStore.Get.
 		Execute(config.PhpNginx)
 	Expect(err).NotTo(HaveOccurred())
 
-	watchexecBuildpack, err = libpakBuildpackStore.Get.
+	watchexecBuildpack, err = targetedLibpakBuildpackStore.Get.
 		Execute(config.Watchexec)
 	Expect(err).NotTo(HaveOccurred())
 
